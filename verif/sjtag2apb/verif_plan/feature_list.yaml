@@ -28,7 +28,7 @@ features:
     description  : 验证 TAP 控制器的硬件复位（TRST_N）和软件复位（5×TMS=1）行为
 
     cases:
-      - case_id   : TC_001
+      - case_id   : sjtag2apb_0001
         case_name : sjtag2apb_tap_hard_reset
         priority  : P1
         description: 验证 TRST_N 异步硬复位后 TAP 状态机回到 TEST_LOGIC_RESET，后续事务正常
@@ -42,7 +42,7 @@ features:
           correctness : scoreboard 验证 IDCODE 读回值 == 32'h5A7B_0001
           completeness: 功能覆盖组 cg_reset_from_state 覆盖从全部 16 个 TAP 状态触发 TRST_N 的场景
 
-      - case_id   : TC_002
+      - case_id   : sjtag2apb_0002
         case_name : sjtag2apb_tap_soft_reset
         priority  : P1
         description: 验证连续 ≥5 个 TMS=1 软复位后 TAP 回到 TEST_LOGIC_RESET
@@ -63,7 +63,7 @@ features:
     description  : 验证 INSTR_IDCODE 指令和设备标识码的正确性
 
     cases:
-      - case_id   : TC_003
+      - case_id   : sjtag2apb_0003
         case_name : sjtag2apb_idcode_read
         priority  : P1
         description: 通过 INSTR_IDCODE 指令读取 IDCODE，验证数值与设计参数一致
@@ -85,7 +85,7 @@ features:
     description  : 验证 INSTR_BYPASS 模式下 TDI 经 1bit 旁路寄存器延迟一拍后出现在 TDO
 
     cases:
-      - case_id   : TC_004
+      - case_id   : sjtag2apb_0004
         case_name : sjtag2apb_bypass
         priority  : P2
         description: BYPASS 模式下 TDO 输出应比 TDI 输入滞后恰好 1 个 TCK
@@ -107,7 +107,7 @@ features:
     description  : 验证通过 SJTAG 发起的 APB 写事务地址、数据正确送达 APB 总线
 
     cases:
-      - case_id   : TC_005
+      - case_id   : sjtag2apb_0005
         case_name : sjtag2apb_apb_write_basic
         priority  : P1
         description: 基本 APB 写操作，验证 PADDR / PWDATA / PWRITE 与 seq_item 一致
@@ -121,7 +121,7 @@ features:
           correctness : scoreboard 断言 PADDR == item.addr，PWDATA == item.wdata，PWRITE == 1
           completeness: 覆盖地址边界（32'h0000_0000 / 32'hFFFF_FFFC）；覆盖全0/全1/随机数据
 
-      - case_id   : TC_006
+      - case_id   : sjtag2apb_0006
         case_name : sjtag2apb_apb_write_burst
         priority  : P2
         description: 连续 N 次 APB 写，验证事务间互不干扰，无地址/数据混淆
@@ -142,7 +142,7 @@ features:
     description  : 验证通过 SJTAG 发起的 APB 读事务数据经 CDC 同步后正确从 TDO 移出
 
     cases:
-      - case_id   : TC_007
+      - case_id   : sjtag2apb_0007
         case_name : sjtag2apb_apb_read_basic
         priority  : P1
         description: 基本 APB 读操作（两次 DR 扫描），PRDATA 正确出现在 TDO
@@ -157,7 +157,7 @@ features:
           correctness : scoreboard 断言 TDO 移出的 PRDATA == APB slave 预置值
           completeness: 覆盖全0/全1/随机数据；覆盖地址边界；覆盖最小等待周期（CDC 刚好完成）
 
-      - case_id   : TC_008
+      - case_id   : sjtag2apb_0008
         case_name : sjtag2apb_apb_read_after_write
         priority  : P1
         description: 先写后读（write-then-read），验证读写数据一致性
@@ -178,7 +178,7 @@ features:
     description  : 验证 APB slave 插入 wait state 时 DUT 正确等待 PREADY 并完成事务
 
     cases:
-      - case_id   : TC_009
+      - case_id   : sjtag2apb_0009
         case_name : sjtag2apb_apb_wait_state
         priority  : P2
         description: APB slave 随机延迟 PREADY（0~7 周期），DUT 应正常完成所有事务
@@ -200,7 +200,7 @@ features:
     description  : 验证 APB slave 返回 PSLVERR=1 时 DUT 不死锁，后续事务可正常执行
 
     cases:
-      - case_id   : TC_010
+      - case_id   : sjtag2apb_0010
         case_name : sjtag2apb_apb_slverr
         priority  : P2
         description: slave 返回 PSLVERR 后 DUT 能继续正常处理后续事务
@@ -222,7 +222,7 @@ features:
     description  : 验证 TCK 与 PCLK 不同频率比下数据同步的正确性，以及 toggle 同步器不丢脉冲
 
     cases:
-      - case_id   : TC_011
+      - case_id   : sjtag2apb_0011
         case_name : sjtag2apb_cdc_freq_ratio
         priority  : P2
         description: 不同 TCK/PCLK 频率比（1:5 / 1:10 / 1:20）下 APB 读写事务均正确
@@ -235,7 +235,7 @@ features:
           correctness : 所有频率组合下读写数据均正确
           completeness: 覆盖频率比 1:5 / 1:10 / 1:20；每种组合下读写各 ≥10 笔
 
-      - case_id   : TC_012
+      - case_id   : sjtag2apb_0012
         case_name : sjtag2apb_cdc_back2back
         priority  : P3
         description: 背靠背 APB 事务（最小事务间隔），验证 toggle 同步器不丢脉冲
@@ -256,7 +256,7 @@ features:
     description  : 全随机混合激励，覆盖上述功能点的交叉组合，以覆盖率驱动收敛
 
     cases:
-      - case_id   : TC_013
+      - case_id   : sjtag2apb_0013
         case_name : sjtag2apb_random_regression
         priority  : P1
         description: 全随机激励，随机操作类型、地址、数据、延迟、错误注入，覆盖多功能点交叉

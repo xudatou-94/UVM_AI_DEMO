@@ -1,7 +1,7 @@
 {
     "cases": [
         {
-            "case_id":      "TC_001",
+            "case_id":      "sjtag2apb_0001",
             "case_name":    "sjtag2apb_tap_hard_reset",
             "case_tag":     ["smoke", "reset"],
             "case_seq":     "sjtag2apb_tap_hard_reset_seq",
@@ -9,7 +9,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_002",
+            "case_id":      "sjtag2apb_0002",
             "case_name":    "sjtag2apb_tap_soft_reset",
             "case_tag":     ["smoke", "reset"],
             "case_seq":     "sjtag2apb_tap_soft_reset_seq",
@@ -17,7 +17,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_003",
+            "case_id":      "sjtag2apb_0003",
             "case_name":    "sjtag2apb_idcode_read",
             "case_tag":     ["smoke", "idcode"],
             "case_seq":     "sjtag2apb_idcode_read_seq",
@@ -25,7 +25,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_004",
+            "case_id":      "sjtag2apb_0004",
             "case_name":    "sjtag2apb_bypass",
             "case_tag":     ["bypass"],
             "case_seq":     "sjtag2apb_bypass_seq",
@@ -33,7 +33,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_005",
+            "case_id":      "sjtag2apb_0005",
             "case_name":    "sjtag2apb_apb_write_basic",
             "case_tag":     ["smoke", "apb", "write"],
             "case_seq":     "sjtag2apb_apb_write_basic_seq",
@@ -41,7 +41,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_006",
+            "case_id":      "sjtag2apb_0006",
             "case_name":    "sjtag2apb_apb_write_burst",
             "case_tag":     ["apb", "write"],
             "case_seq":     "sjtag2apb_apb_write_burst_seq",
@@ -49,7 +49,7 @@
             "case_timeout": 3600
         },
         {
-            "case_id":      "TC_007",
+            "case_id":      "sjtag2apb_0007",
             "case_name":    "sjtag2apb_apb_read_basic",
             "case_tag":     ["smoke", "apb", "read"],
             "case_seq":     "sjtag2apb_apb_read_basic_seq",
@@ -57,7 +57,7 @@
             "case_timeout": 1800
         },
         {
-            "case_id":      "TC_008",
+            "case_id":      "sjtag2apb_0008",
             "case_name":    "sjtag2apb_apb_read_after_write",
             "case_tag":     ["smoke", "apb", "read", "write"],
             "case_seq":     "sjtag2apb_apb_read_after_write_seq",
@@ -65,7 +65,7 @@
             "case_timeout": 3600
         },
         {
-            "case_id":      "TC_009",
+            "case_id":      "sjtag2apb_0009",
             "case_name":    "sjtag2apb_apb_wait_state",
             "case_tag":     ["apb", "wait_state"],
             "case_seq":     "sjtag2apb_apb_wait_state_seq",
@@ -73,7 +73,7 @@
             "case_timeout": 3600
         },
         {
-            "case_id":      "TC_010",
+            "case_id":      "sjtag2apb_0010",
             "case_name":    "sjtag2apb_apb_slverr",
             "case_tag":     ["apb", "error"],
             "case_seq":     "sjtag2apb_apb_slverr_seq",
@@ -81,7 +81,7 @@
             "case_timeout": 3600
         },
         {
-            "case_id":      "TC_011",
+            "case_id":      "sjtag2apb_0011",
             "case_name":    "sjtag2apb_cdc_freq_ratio",
             "case_tag":     ["cdc"],
             "case_seq":     "sjtag2apb_cdc_freq_ratio_seq",
@@ -89,7 +89,7 @@
             "case_timeout": 7200
         },
         {
-            "case_id":      "TC_012",
+            "case_id":      "sjtag2apb_0012",
             "case_name":    "sjtag2apb_cdc_back2back",
             "case_tag":     ["cdc"],
             "case_seq":     "sjtag2apb_cdc_back2back_seq",
@@ -97,7 +97,7 @@
             "case_timeout": 3600
         },
         {
-            "case_id":      "TC_013",
+            "case_id":      "sjtag2apb_0013",
             "case_name":    "sjtag2apb_random_regression",
             "case_tag":     ["regression", "random"],
             "case_seq":     "sjtag2apb_random_regression_seq",
