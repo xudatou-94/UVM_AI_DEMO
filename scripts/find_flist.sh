@@ -39,7 +39,7 @@ fi
 #-----------------------------------------------------------------------------
 VERIF_DIR="${REPO_ROOT}/verif"
 PROJ_DIR="${VERIF_DIR}/${PROJ}"
-DUT_FLIST="${PROJ_DIR}/${PROJ}.flist"
+DUT_FLIST="${PROJ_DIR}/dut.flist"
 OUTPUT_DIR="${OUTPUT_ROOT}/${PROJ}/compile"
 
 #-----------------------------------------------------------------------------
@@ -61,11 +61,12 @@ fi
 
 if [ ! -f "${DUT_FLIST}" ]; then
     echo -e "${RED}[ERROR] 文件列表不存在: ${DUT_FLIST}${NC}"
-    echo -e "${YELLOW}[INFO]  请在项目目录下创建 ${PROJ}.flist 文件，格式示例:${NC}"
+    echo -e "${YELLOW}[INFO]  请在项目目录下创建 dut.flist 文件，格式示例:${NC}"
     echo ""
-    echo "  // DUT RTL 文件列表"
-    echo "  +incdir+\${REPO_ROOT}/design/${PROJ}/rtl"
-    echo "  \${REPO_ROOT}/design/${PROJ}/rtl/${PROJ}.sv"
+    echo "  // 引用 RTL 文件列表"
+    echo "  -f \${REPO_ROOT}/design/${PROJ}/${PROJ}.flist"
+    echo "  // 追加 Testbench 文件"
+    echo "  \${REPO_ROOT}/verif/${PROJ}/tb_top.sv"
     echo ""
     exit 1
 fi

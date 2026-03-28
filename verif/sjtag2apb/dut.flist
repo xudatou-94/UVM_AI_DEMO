@@ -1,0 +1,18 @@
+// =============================================================================
+// dut.flist - sjtag2apb 验证环境完整文件列表
+//
+// 说明：
+//   供 VCS 编译时通过 -f 参数加载，包含 DUT RTL 及 Testbench 所有文件。
+//   RTL 文件通过引用 design 目录下的 sjtag2apb.flist 维护，
+//   验证文件（Interface、VIP、TB）在此处追加。
+// =============================================================================
+
+// RTL 文件列表（由设计侧维护）
+-f ${REPO_ROOT}/design/sjtag2apb/sjtag2apb.flist
+
+// ---- 验证文件（后续逐步添加）----
+// +incdir+${REPO_ROOT}/verif/sjtag2apb
+// +incdir+${REPO_ROOT}/vip/sjtag
+// +incdir+${REPO_ROOT}/vip/apb
+//
+// ${REPO_ROOT}/verif/sjtag2apb/tb_top.sv
