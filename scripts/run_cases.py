@@ -20,7 +20,8 @@
 #   过滤选项（不指定则运行全部）：
 #     --tag      <标签>    按 tag 过滤，多个 tag 用逗号分隔（取并集）
 #     --id       <ID>      按 case_id 过滤，多个 ID 用逗号分隔
-#     --name     <名称>    按 case_name 过滤，多个名称用逗号分隔
+#     --name     <名称>    按 case_name 精确过滤，多个名称用逗号分隔
+#     --regex    <正则>    按正则表达式匹配 case_name 过滤
 #
 #   运行选项：
 #     --seed     <种子>    指定仿真种子（默认 random）
@@ -34,6 +35,7 @@
 # =============================================================================
 
 import os
+import re
 import sys
 import json
 import argparse
@@ -145,7 +147,7 @@ class CaseParser:
 # CaseFilter - 按条件过滤激励列表
 # =============================================================================
 class CaseFilter:
-    """对激励列表进行过滤，支持按 tag、case_id、case_name 组合筛选"""
+    """对激励列表进行过滤，支持按 tag、case_id、case_name、正则表达式组合筛选"""
 
     def __init__(self, cases: list[dict]):
         self.cases = cases
@@ -153,10 +155,17 @@ class CaseFilter:
     def filter(self,
                tags: list[str] | None = None,
                ids: list[str] | None = None,
-               names: list[str] | None = None) -> list[dict]:
+               names: list[str] | None = None,
+               regex: str | None = None) -> list[dict]:
         """
         过滤激励。多个条件同时指定时取交集。
         单个条件内（如多个 tag）取并集。
+
+        参数：
+            tags  : 按 case_tag 过滤，多个 tag 取并集
+            ids   : 按 case_id 精确匹配
+            names : 按 case_name 精确匹配
+            regex : 按正则表达式匹配 case_name（与 names 独立，同时存在时取交集）
         """
         result = self.cases
 
@@ -171,6 +180,14 @@ class CaseFilter:
         if names:
             name_set = set(n.strip() for n in names)
             result = [c for c in result if c["case_name"] in name_set]
+
+        if regex:
+            try:
+                pattern = re.compile(regex)
+            except re.error as e:
+                log_error(f"正则表达式无效: '{regex}' -> {e}")
+                sys.exit(1)
+            result = [c for c in result if pattern.search(c["case_name"])]
 
         return result
 
@@ -290,12 +307,15 @@ def parse_args():
 
     # 过滤选项
     filter_group = parser.add_argument_group("过滤选项（不指定则运行全部激励）")
-    filter_group.add_argument("--tag",  nargs="+", metavar="TAG",
+    filter_group.add_argument("--tag",   nargs="+", metavar="TAG",
                               help="按 case_tag 过滤，多个 tag 取并集")
-    filter_group.add_argument("--id",   nargs="+", metavar="ID",
+    filter_group.add_argument("--id",    nargs="+", metavar="ID",
                               help="按 case_id 过滤")
-    filter_group.add_argument("--name", nargs="+", metavar="NAME",
-                              help="按 case_name 过滤")
+    filter_group.add_argument("--name",  nargs="+", metavar="NAME",
+                              help="按 case_name 精确匹配过滤")
+    filter_group.add_argument("--regex", metavar="PATTERN",
+                              help="按正则表达式匹配 case_name 过滤\n"
+                                   "示例: --regex 'write.*test'  --regex '^TC_00[12]'")
 
     # 运行选项
     run_group = parser.add_argument_group("运行选项")
@@ -337,6 +357,7 @@ def main():
         tags=args.tag,
         ids=args.id,
         names=args.name,
+        regex=args.regex,
     )
     log_info(f"过滤后匹配激励数量: {len(matched)}")
 

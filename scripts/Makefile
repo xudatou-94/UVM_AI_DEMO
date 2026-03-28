@@ -32,9 +32,10 @@ FUNC_COV  ?= 0               # 1=开启功能覆盖率（UVM covergroup）
 GUI       ?= 0               # 1=以 GUI 模式打开调试工具
 
 # 回归过滤选项（仅 make regress 使用，由 run_cases.py 解析）
-TAG       ?=                 # 按 case_tag 过滤，多个标签用空格分隔
-CASE_ID   ?=                 # 按 case_id 过滤，多个 ID 用空格分隔
-CASE_NAME ?=                 # 按 case_name 过滤
+TAG        ?=                # 按 case_tag 过滤，多个标签用空格分隔
+CASE_ID    ?=                # 按 case_id 过滤，多个 ID 用空格分隔
+CASE_NAME  ?=                # 按 case_name 精确过滤
+CASE_REGEX ?=                # 按正则表达式匹配 case_name 过滤
 
 #-----------------------------------------------------------------------------
 # 输出目录
@@ -87,6 +88,9 @@ ifneq ($(CASE_ID),)
 endif
 ifneq ($(CASE_NAME),)
     REGRESS_ARGS += --name $(CASE_NAME)
+endif
+ifneq ($(CASE_REGEX),)
+    REGRESS_ARGS += --regex '$(CASE_REGEX)'
 endif
 ifeq ($(WAVE),1)
     REGRESS_ARGS += --wave
@@ -176,11 +180,13 @@ help:
 	@echo " 回归过滤变量 (make regress 使用):"
 	@echo "   TAG        按 case_tag 过滤，多值用空格分隔"
 	@echo "   CASE_ID    按 case_id 过滤"
-	@echo "   CASE_NAME  按 case_name 过滤"
+	@echo "   CASE_NAME  按 case_name 精确过滤"
+	@echo "   CASE_REGEX 按正则表达式匹配 case_name 过滤"
 	@echo ""
 	@echo " 使用示例:"
 	@echo "   make all PROJ=apb_slave TC=apb_write_test SEED=12345"
 	@echo "   make regress PROJ=apb_slave TAG='smoke write' CODE_COV=1"
 	@echo "   make regress PROJ=apb_slave CASE_ID='TC_001 TC_003'"
+	@echo "   make regress PROJ=apb_slave CASE_REGEX='write.*test'"
 	@echo "   make debug PROJ=apb_slave TC=apb_write_test"
 	@echo "============================================================"
