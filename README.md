@@ -17,7 +17,8 @@
 ```
 UVM_AI_DEMO/
 ├── design/      # DUT（被测设计）RTL 代码
-├── verif/       # Testbench、VIP、验证激励
+├── vip/         # 验证使用的 VIP（Verification IP）
+├── verif/       # Testbench、验证激励（Sequence、Test）
 └── scripts/     # 编译、仿真、回归等自动化脚本
 ```
 
@@ -25,7 +26,8 @@ UVM_AI_DEMO/
 
 ### 1. 代码组织
 - `design/`：存放 **RTL**（被测设计）代码
-- `verif/`：存放 **VIP**、Testbench、Sequence、Test 等验证组件
+- `vip/`：存放验证使用的 **VIP**（Verification IP）
+- `verif/`：存放 Testbench、Sequence、Test 等验证激励
 - `scripts/`：存放所有自动化脚本
 
 ### 2. 验证流程封装
