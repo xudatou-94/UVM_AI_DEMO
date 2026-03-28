@@ -1,0 +1,18 @@
+# VCS/仿真输出
+output/
+
+# VCS 编译中间文件
+csrc/
+simv
+simv.daidir/
+*.vpd
+*.fsdb
+*.log
+
+# Verdi 相关
+novas.*
+verdiLog/
+
+# 覆盖率数据
+*.vdb/
+urgReport/
