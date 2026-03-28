@@ -1,0 +1,32 @@
+{
+    "cases": [
+        {
+            "case_id":     "TC_001",
+            "case_name":   "base_test",
+            "case_tag":    ["smoke"],
+            "case_seq":    "example_base_seq",
+            "case_define": []
+        },
+        {
+            "case_id":     "TC_002",
+            "case_name":   "write_test",
+            "case_tag":    ["smoke", "write"],
+            "case_seq":    "example_write_seq",
+            "case_define": ["+DATA_WIDTH=32", "+BURST_LEN=4"]
+        },
+        {
+            "case_id":     "TC_003",
+            "case_name":   "read_test",
+            "case_tag":    ["read"],
+            "case_seq":    "example_read_seq",
+            "case_define": ["+DATA_WIDTH=32"]
+        },
+        {
+            "case_id":     "TC_004",
+            "case_name":   "stress_test",
+            "case_tag":    ["stress", "write", "read"],
+            "case_seq":    "example_stress_seq",
+            "case_define": ["+DATA_WIDTH=32", "+BURST_LEN=16", "+STRESS_MODE=1"]
+        }
+    ]
+}
