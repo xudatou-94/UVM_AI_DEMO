@@ -1,0 +1,149 @@
+#=============================================================================
+# .gitlab-ci.yml - GitLab CI/CD 流水线配置
+#
+# 流水线阶段：
+#   1. setup   - 环境检查
+#   2. compile - 编译 DUT + Testbench
+#   3. smoke   - smoke 级别激励快速验证
+#   4. regress - 全量回归（仅 main/develop 分支触发）
+#   5. report  - 汇总报告与覆盖率
+#
+# 使用前提：
+#   - GitLab Runner 已配置 VCS 2020 环境
+#   - Runner 可访问 EDA License 服务器
+#   - 建议在 runner 上预先 source setup.sh 或在镜像中配置好环境
+#=============================================================================
+
+variables:
+  # 项目名称（在各 job 中覆盖）
+  PROJ: "example"
+  # 默认不开覆盖率（smoke 阶段快速验证）
+  CODE_COV: "0"
+  FUNC_COV: "0"
+  WAVE: "0"
+  JOBS: "4"
+
+# 流水线阶段定义
+stages:
+  - setup
+  - compile
+  - smoke
+  - regress
+  - report
+
+#=============================================================================
+# 公共配置（锚点）
+#=============================================================================
+.common_before: &common_before
+  before_script:
+    - source scripts/setup.sh || true   # 环境初始化（工具路径/License）
+    - echo "REPO_ROOT=${CI_PROJECT_DIR}"
+    - export REPO_ROOT="${CI_PROJECT_DIR}"
+    - export OUTPUT_ROOT="${CI_PROJECT_DIR}/output"
+
+.common_artifacts: &common_artifacts
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - output/
+
+#=============================================================================
+# Stage 1: setup - 检查 EDA 工具可用性
+#=============================================================================
+check_env:
+  stage: setup
+  <<: *common_before
+  script:
+    - which vcs   || echo "WARNING: vcs not found"
+    - which verdi || echo "WARNING: verdi not found"
+    - which urg   || echo "WARNING: urg not found"
+    - python3 --version
+    - echo "Environment check done"
+  allow_failure: true  # 工具不存在时不阻塞流水线（CI 环境可能无完整工具链）
+
+#=============================================================================
+# Stage 2: compile - 编译
+#=============================================================================
+compile:
+  stage: compile
+  <<: *common_before
+  <<: *common_artifacts
+  script:
+    - cd scripts
+    - make compile PROJ=${PROJ} CODE_COV=${CODE_COV}
+  needs: []  # 不依赖 setup，直接并行启动
+
+#=============================================================================
+# Stage 3: smoke - 快速冒烟测试
+#=============================================================================
+smoke_test:
+  stage: smoke
+  <<: *common_before
+  <<: *common_artifacts
+  script:
+    - cd scripts
+    - make regress PROJ=${PROJ} TAG=smoke JOBS=${JOBS} WAVE=0
+  needs:
+    - compile
+
+#=============================================================================
+# Stage 4: regress - 全量回归（仅 main/develop 分支）
+#=============================================================================
+full_regress:
+  stage: regress
+  <<: *common_before
+  <<: *common_artifacts
+  script:
+    - cd scripts
+    - make regress PROJ=${PROJ} JOBS=${JOBS} CODE_COV=1 FUNC_COV=1 WAVE=0
+  needs:
+    - smoke_test
+  rules:
+    # 仅在 main 或 develop 分支上触发全量回归
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    # MR 时也可触发（可选）
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+
+#=============================================================================
+# Stage 5: report - 生成报告与覆盖率合并
+#=============================================================================
+gen_report:
+  stage: report
+  <<: *common_before
+  script:
+    - cd scripts
+    - make report PROJ=${PROJ}
+  needs:
+    - job: full_regress
+      optional: true
+    - job: smoke_test
+      optional: true
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - output/*/reports/
+    reports:
+      # 若生成了 JUnit XML 格式报告可在此配置（需扩展 gen_report.py）
+      # junit: output/*/reports/junit.xml
+  rules:
+    - when: always
+
+merge_coverage:
+  stage: report
+  <<: *common_before
+  script:
+    - cd scripts
+    - make merge_cov PROJ=${PROJ}
+  needs:
+    - job: full_regress
+      optional: true
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - output/*/cov_report/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
