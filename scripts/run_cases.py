@@ -261,6 +261,7 @@ class CaseRunner:
         env["WAVE"]       = "1" if self.args.wave else "0"
         env["CODE_COV"]   = "1" if self.args.code_cov else "0"
         env["FUNC_COV"]   = "1" if self.args.func_cov else "0"
+        env["AUTO_DEBUG"] = "1" if self.args.auto_debug else "0"
 
         # case_define：将 plusarg 列表拼接为空格分隔的字符串
         env["CASE_DEFINE"] = " ".join(case.get("case_define", []))
@@ -325,11 +326,13 @@ def parse_args():
                            help="UVM 打印级别（默认: UVM_MEDIUM）")
     run_group.add_argument("--wave",      action="store_true",
                            help="开启波形转储（FSDB）")
-    run_group.add_argument("--code_cov",  action="store_true",
+    run_group.add_argument("--code_cov",   action="store_true",
                            help="开启代码覆盖率统计（line/cond/fsm/tgl/branch）")
-    run_group.add_argument("--func_cov",  action="store_true",
+    run_group.add_argument("--func_cov",   action="store_true",
                            help="开启功能覆盖率统计（UVM covergroup）")
-    run_group.add_argument("--dry_run",   action="store_true",
+    run_group.add_argument("--auto_debug", action="store_true",
+                           help="仿真结束后自动打开波形调试工具（需同时指定 --wave）")
+    run_group.add_argument("--dry_run",    action="store_true",
                            help="仅打印命令，不实际执行仿真")
 
     return parser.parse_args()

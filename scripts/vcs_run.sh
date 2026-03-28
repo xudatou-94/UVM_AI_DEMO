@@ -19,6 +19,8 @@
 #         CASE_SEQ    UVM sequence 类名（传递给 TB）
 #         CASE_DEFINE 激励自定义 plusarg 列表（空格分隔）
 #         CASE_ID     激励唯一 ID（用于日志标记）
+#         AUTO_DEBUG  仿真结束后自动打开波形调试工具（默认 0）
+#                     注意：AUTO_DEBUG=1 时 WAVE 必须同时为 1
 #
 # 基于 Synopsys VCS 2020
 #=============================================================================
@@ -41,6 +43,7 @@ VERBOSITY="${VERBOSITY:-UVM_MEDIUM}"
 WAVE="${WAVE:-1}"
 CODE_COV="${CODE_COV:-0}"
 FUNC_COV="${FUNC_COV:-0}"
+AUTO_DEBUG="${AUTO_DEBUG:-0}"
 CASE_SEQ="${CASE_SEQ:-}"
 CASE_DEFINE="${CASE_DEFINE:-}"
 CASE_ID="${CASE_ID:-}"
@@ -174,5 +177,19 @@ if [ "${WAVE}" = "1" ] && [ -f "${FSDB_FILE}" ]; then
 fi
 
 echo "============================================================"
+
+#-----------------------------------------------------------------------------
+# 自动打开波形调试工具（AUTO_DEBUG=1 且 WAVE=1 时触发）
+#-----------------------------------------------------------------------------
+if [ "${AUTO_DEBUG}" = "1" ]; then
+    if [ "${WAVE}" != "1" ]; then
+        echo -e "${YELLOW}[WARN] AUTO_DEBUG=1 但 WAVE=0，跳过自动打开波形${NC}"
+    elif [ ! -f "${FSDB_FILE}" ]; then
+        echo -e "${YELLOW}[WARN] FSDB 文件不存在，跳过自动打开波形: ${FSDB_FILE}${NC}"
+    else
+        echo -e "${GREEN}[INFO] 自动打开波形调试工具...${NC}"
+        bash "${REPO_ROOT}/scripts/vcs_debug.sh"
+    fi
+fi
 
 exit ${SIM_EXIT}
