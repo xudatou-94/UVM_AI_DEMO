@@ -154,55 +154,85 @@ uvm_config_db #(apb_agent_cfg)::set(this, "apb_slv_agt", "cfg", cfg);
 
 #### 方式一：使用内置内存模型（apb_slave_resp_seq）
 
-`apb_slave_resp_seq` 内置了一个简单的关联数组内存，写操作存储数据，读操作返回存储值：
+`apb_slave_resp_seq` 内置了一个关联数组内存模型，并通过 TLM FIFO 与 slave driver 通信。
+使用前需设置 `p_agent` 句柄，然后在后台 fork 启动：
 
 ```systemverilog
-class mem_slave_test extends uvm_test;
+class my_env extends uvm_env;
+  apb_agent            apb_slv_agt;
+  apb_slave_resp_seq   apb_slv_seq;
+
+  function void build_phase(uvm_phase phase);
+    apb_agent_cfg cfg = apb_agent_cfg::type_id::create("cfg");
+    cfg.role      = apb_agent_cfg::APB_SLAVE;
+    cfg.is_active = UVM_ACTIVE;
+    uvm_config_db #(apb_agent_cfg)::set(this, "apb_slv_agt", "cfg", cfg);
+    apb_slv_agt = apb_agent::type_id::create("apb_slv_agt", this);
+    apb_slv_seq = apb_slave_resp_seq::type_id::create("apb_slv_seq");
+  endfunction
+
   task run_phase(uvm_phase phase);
-    apb_slave_resp_seq slv_seq;
-    phase.raise_objection(this);
-    slv_seq = apb_slave_resp_seq::type_id::create("slv_seq");
-    // 预置初始内存值
-    slv_seq.mem[32'h0000_0000] = 32'h1234_5678;
-    slv_seq.start(env.apb_slv_agt.seqr);
-    phase.drop_objection(this);
+    // 预置内存值（可在 run_phase 启动前配置）
+    apb_slv_seq.mem[32'h0000_0000] = 32'h1234_5678;
+    // 设置 agent 句柄并后台运行
+    apb_slv_seq.p_agent = apb_slv_agt;
+    fork apb_slv_seq.start(null); join_none
   endtask
 endclass
 ```
 
-#### 方式二：自定义响应逻辑
+#### 方式二：运行时动态配置响应行为
 
-继承 `apb_slave_resp_seq` 并重写 `body`，实现更复杂的响应行为（如错误注入、延迟变化）：
+`apb_slave_resp_seq` 暴露以下字段，可在仿真运行中随时修改：
+
+```systemverilog
+// 修改全局等待状态数
+env.apb_slv_seq.default_wait_states = 3;
+
+// 预置或修改某地址的读数据
+env.apb_slv_seq.mem[32'h0000_0010] = 32'hDEAD_CAFE;
+
+// 对特定地址注入 PSLVERR
+env.apb_slv_seq.pslverr_addrs[32'hBAD_ADDR] = 1;
+
+// 清除 PSLVERR 注入
+env.apb_slv_seq.pslverr_addrs.delete(32'hBAD_ADDR);
+```
+
+#### 方式三：自定义响应逻辑
+
+继承 `apb_slave_resp_seq` 并重写 `body`，通过相同的 TLM FIFO 接口实现复杂响应：
 
 ```systemverilog
 class err_inject_slave_seq extends apb_slave_resp_seq;
   `uvm_object_utils(err_inject_slave_seq)
 
-  logic [31:0] err_addr = 32'h0000_00FF;  // 此地址触发 PSLVERR
+  logic [31:0] err_addr = 32'h0000_00FF;
 
   task body();
     apb_seq_item req, rsp;
     forever begin
-      p_sequencer.wait_for_sequences();
-      if (p_sequencer.has_do_available()) begin
-        `uvm_create(req)
-        `uvm_rand_send(req)
+      // 从 req_fifo 获取 driver 观察到的总线请求
+      p_agent.req_fifo.get(req);
 
-        rsp = apb_seq_item::type_id::create("rsp");
-        rsp.copy(req);
+      rsp = apb_seq_item::type_id::create("rsp");
+      rsp.addr = req.addr;
+      rsp.rw   = req.rw;
 
-        if (req.addr == err_addr) begin
-          rsp.pslverr     = 1;
-          rsp.wait_states = 2;
-        end else begin
-          rsp.pslverr     = 0;
-          rsp.wait_states = $urandom_range(0, 3);
-          if (!req.rw)
-            rsp.rdata = mem.exists(req.addr) ? mem[req.addr] : 32'hDEAD_BEEF;
-          else
-            mem[req.addr] = req.wdata;
-        end
+      if (req.addr == err_addr) begin
+        rsp.pslverr     = 1;
+        rsp.wait_states = 2;
+      end else begin
+        rsp.pslverr     = 0;
+        rsp.wait_states = $urandom_range(0, 3);
+        if (!req.rw)
+          rsp.rdata = mem.exists(req.addr) ? mem[req.addr] : 32'hDEAD_BEEF;
+        else
+          mem[req.addr] = req.wdata;
       end
+
+      // 向 rsp_fifo 推送响应，driver 收到后驱动总线
+      p_agent.rsp_fifo.put(rsp);
     end
   endtask
 endclass
@@ -316,3 +346,40 @@ class bridge_env extends uvm_env;
   endfunction
 endclass
 ```
+
+---
+
+## Slave Driver 设计说明（TLM FIFO 方案）
+
+### 原版本问题
+
+初始版本的 `apb_slave_driver` 继承自 `uvm_driver #(apb_seq_item)`，
+在 `respond_to_transfer()` 中通过以下方式与 sequencer 通信：
+
+```systemverilog
+seq_item_port.put(req);   // 尝试将请求推送给 sequencer
+seq_item_port.get(rsp);   // 尝试从 sequencer 获取响应
+```
+
+**根本问题**：`seq_item_port` 的类型是 `uvm_seq_item_pull_port`，其设计语义是
+**"sequencer 产生激励 → driver 拉取"**。而 APB slave 的场景恰恰相反——激励来自总线
+（DUT 是 APB master），driver 需要被动响应。对 `uvm_seq_item_pull_port` 调用 `put()`
+在标准 `uvm_sequencer` 上没有对应的接收端，会导致调用永久阻塞。
+
+### 修正方案（TLM FIFO 双向通信）
+
+```
+                 req_fifo（深度=1）
+slave_drv ──put(observed_req)──> ──get──> apb_slave_resp_seq
+          <──get(response)────── <──put── apb_slave_resp_seq
+                 rsp_fifo（深度=1）
+```
+
+| 组件 | 变化 |
+|------|------|
+| `apb_slave_driver` | 改继承 `uvm_component`，去掉 `seq_item_port`；新增 `req_port`（put）和 `rsp_port`（get）|
+| `apb_agent` | slave 模式下额外创建 `req_fifo` / `rsp_fifo`；connect_phase 连接 driver 端口到 FIFO |
+| `apb_slave_resp_seq` | 改继承 `uvm_sequence_base`；通过 `p_agent.req_fifo.get()` / `p_agent.rsp_fifo.put()` 收发数据 |
+
+**FIFO 深度为 1** 的原因：APB 总线是单请求单响应协议，不允许请求积压；深度 1 确保
+driver 和 sequence 严格按照"一请求一响应"配对，避免响应错位。

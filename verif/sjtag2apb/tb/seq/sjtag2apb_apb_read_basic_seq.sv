@@ -46,9 +46,9 @@ class sjtag2apb_apb_read_basic_seq extends sjtag2apb_tb_base_seq;
 
     do_reset();
 
-    // 预加载 slave 内存
+    // 预加载 slave 内存（通过 apb_slv_seq 的内置内存模型）
     for (int i = 0; i < 10; i++) begin
-      p_env.apb_slave.preload(preload_addr[i], preload_data[i]);
+      preload_slave(preload_addr[i], preload_data[i]);
     end
 
     wait_apb_cycles(2);

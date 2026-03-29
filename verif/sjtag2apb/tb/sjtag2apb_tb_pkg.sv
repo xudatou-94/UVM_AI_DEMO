@@ -16,10 +16,9 @@ package sjtag2apb_tb_pkg;
   // --------------------------------------------------------------------------
   // 基础设施层（按依赖顺序：无引用关系的先，有引用关系的后）
   // --------------------------------------------------------------------------
-  `include "sjtag2apb_apb_slave_model.sv"   // APB 从设备仿真模型
   `include "sjtag2apb_scoreboard.sv"         // 记分板（依赖 apb_seq_item）
   `include "sjtag2apb_coverage.sv"           // 覆盖率收集器（依赖 sjtag/apb seq_item）
-  `include "sjtag2apb_env.sv"                // 验证环境（依赖上述三个组件）
+  `include "sjtag2apb_env.sv"                // 验证环境（依赖 apb_slave_resp_seq from VIP）
 
   // --------------------------------------------------------------------------
   // 测试基类（依赖 env）
