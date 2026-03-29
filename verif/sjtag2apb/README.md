@@ -1,11 +1,15 @@
 # sjtag2apb 激励运行指南
 
-所有命令均在**仓库根目录**下执行，通过 `scripts/Makefile` 统一管理。
+所有命令均在 `scripts/` 目录下执行，通过 `Makefile` 统一管理。
+
+```bash
+cd scripts/
+```
 
 ## 环境初始化
 
 ```bash
-source scripts/setup.sh
+source setup.sh
 ```
 
 ---
@@ -138,3 +142,5 @@ make debug PROJ=sjtag2apb TC=sjtag2apb_apb_slverr_test
 ```bash
 make help
 ```
+
+> 以上命令均在 `scripts/` 目录下执行。
