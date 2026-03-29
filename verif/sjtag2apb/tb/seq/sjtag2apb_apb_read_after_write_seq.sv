@@ -30,13 +30,13 @@ class sjtag2apb_apb_read_after_write_seq extends sjtag2apb_tb_base_seq;
       wait_ns = $urandom_range(2, 10) * 100;   // 随机等待 200ns~1000ns
 
       // 写操作
-      apb_write(addr, wdata);
+      sjtag2apb_write(addr, wdata);
 
       // 随机等待（覆盖 CDC 同步时延）
       #(wait_ns * 1ns);
 
       // 读操作
-      apb_read(addr, rdata);
+      sjtag2apb_read(addr, rdata);
 
       if (rdata !== wdata) begin
         fail_cnt++;

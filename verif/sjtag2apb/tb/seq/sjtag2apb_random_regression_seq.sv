@@ -69,7 +69,7 @@ class sjtag2apb_random_regression_seq extends sjtag2apb_tb_base_seq;
         // 避开 pslverr_addr（免得污染 shadow memory）
         if (pslverr_active && addr == pslverr_addr)
           addr = addr + 4;
-        apb_write(addr, wdata);
+        sjtag2apb_write(addr, wdata);
         // 更新 shadow memory
         seq_shadow[addr] = wdata;
         if (!written_addrs.size() || written_addrs[$] != addr)
@@ -82,7 +82,7 @@ class sjtag2apb_random_regression_seq extends sjtag2apb_tb_base_seq;
         if (written_addrs.size() > 0) begin
           // 随机选一个已写地址
           addr = written_addrs[$urandom_range(0, written_addrs.size()-1)];
-          apb_read(addr, rdata);
+          sjtag2apb_read(addr, rdata);
           if (rdata !== seq_shadow[addr]) begin
             fail_cnt++;
             `uvm_error("RANDOM_REGR",
@@ -98,7 +98,7 @@ class sjtag2apb_random_regression_seq extends sjtag2apb_tb_base_seq;
           // 还没有写过的地址，转为写操作
           addr  = {$urandom()} & 32'hFFFF_FFFC;
           wdata = $urandom();
-          apb_write(addr, wdata);
+          sjtag2apb_write(addr, wdata);
           seq_shadow[addr] = wdata;
           written_addrs.push_back(addr);
         end

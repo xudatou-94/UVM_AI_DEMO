@@ -37,10 +37,10 @@ class sjtag2apb_apb_wait_state_seq extends sjtag2apb_tb_base_seq;
       wdata = $urandom();
 
       // 写操作（slave 将在 ws 个周期后拉高 PREADY）
-      apb_write(addr, wdata);
+      sjtag2apb_write(addr, wdata);
 
       // 读回校验
-      apb_read(addr, rdata);
+      sjtag2apb_read(addr, rdata);
 
       if (rdata !== wdata) begin
         fail_cnt++;

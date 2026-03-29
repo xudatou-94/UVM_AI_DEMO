@@ -40,12 +40,12 @@ class sjtag2apb_apb_write_burst_seq extends sjtag2apb_tb_base_seq;
 
     // 连续写入 N 笔（无额外延迟，背靠背）
     for (int i = 0; i < n; i++) begin
-      apb_write(addr_arr[i], data_arr[i]);
+      sjtag2apb_write(addr_arr[i], data_arr[i]);
     end
 
     // 逐一读回校验
     for (int i = 0; i < n; i++) begin
-      apb_read(addr_arr[i], rdata);
+      sjtag2apb_read(addr_arr[i], rdata);
       if (rdata !== data_arr[i]) begin
         fail_cnt++;
         `uvm_error("APB_WRITE_BURST",

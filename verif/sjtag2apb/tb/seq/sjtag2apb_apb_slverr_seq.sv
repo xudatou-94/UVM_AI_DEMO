@@ -26,12 +26,12 @@ class sjtag2apb_apb_slverr_seq extends sjtag2apb_tb_base_seq;
     // ---- 场景 1：写事务触发 PSLVERR ----
     `uvm_info("APB_SLVERR", "场景 1：写事务触发 PSLVERR", UVM_MEDIUM)
     configure_slave_err(err_addr, 1);
-    apb_write(err_addr, 32'hBAD_DATA);   // PSLVERR 触发，DUT 应不死锁
+    sjtag2apb_write(err_addr, 32'hBAD_DATA);   // PSLVERR 触发，DUT 应不死锁
     wait_apb_cycles(5);
 
     // ---- 场景 2：读事务触发 PSLVERR ----
     `uvm_info("APB_SLVERR", "场景 2：读事务触发 PSLVERR", UVM_MEDIUM)
-    apb_read(err_addr, rdata);           // PSLVERR 触发，rdata 为无效值
+    sjtag2apb_read(err_addr, rdata);           // PSLVERR 触发，rdata 为无效值
     wait_apb_cycles(5);
 
     // ---- 验证后续正常事务不受影响 ----
@@ -41,8 +41,8 @@ class sjtag2apb_apb_slverr_seq extends sjtag2apb_tb_base_seq;
     for (int i = 0; i < 5; i++) begin
       norm_addr = ($urandom_range(1, 15) * 4);   // 避开 err_addr
       wdata     = $urandom();
-      apb_write(norm_addr, wdata);
-      apb_read(norm_addr, rdata);
+      sjtag2apb_write(norm_addr, wdata);
+      sjtag2apb_read(norm_addr, rdata);
 
       if (rdata !== wdata) begin
         fail_cnt++;
@@ -60,16 +60,16 @@ class sjtag2apb_apb_slverr_seq extends sjtag2apb_tb_base_seq;
     // ---- 场景 3：连续两次 PSLVERR ----
     `uvm_info("APB_SLVERR", "场景 3：连续两次 PSLVERR", UVM_MEDIUM)
     configure_slave_err(err_addr, 1);
-    apb_write(err_addr, 32'hDEAD_0001);
-    apb_write(err_addr, 32'hDEAD_0002);
+    sjtag2apb_write(err_addr, 32'hDEAD_0001);
+    sjtag2apb_write(err_addr, 32'hDEAD_0002);
     wait_apb_cycles(5);
     configure_slave_err(err_addr, 0);
 
     // 再次确认 DUT 正常工作
     norm_addr = 32'h0000_0100;
     wdata     = 32'hC0DE_C0DE;
-    apb_write(norm_addr, wdata);
-    apb_read(norm_addr, rdata);
+    sjtag2apb_write(norm_addr, wdata);
+    sjtag2apb_read(norm_addr, rdata);
     if (rdata !== wdata) begin
       fail_cnt++;
       `uvm_error("APB_SLVERR", "连续 PSLVERR 后 DUT 功能异常")

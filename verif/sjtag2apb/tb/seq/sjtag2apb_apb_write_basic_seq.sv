@@ -24,7 +24,7 @@ class sjtag2apb_apb_write_basic_seq extends sjtag2apb_tb_base_seq;
     repeat(20) begin
       addr  = {$urandom()} & 32'hFFFF_FFFC;  // 4 字节对齐
       wdata = $urandom();
-      apb_write(addr, wdata);
+      sjtag2apb_write(addr, wdata);
       `uvm_info("APB_WRITE_BASIC",
         $sformatf("APB 写：addr=0x%08x data=0x%08x", addr, wdata), UVM_HIGH)
     end

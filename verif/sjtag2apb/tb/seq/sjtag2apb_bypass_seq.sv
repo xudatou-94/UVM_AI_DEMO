@@ -35,7 +35,7 @@ class sjtag2apb_bypass_seq extends sjtag2apb_tb_base_seq;
       for (i = 0; i < 5; i++) begin
         addr[i]  = (i << 2);         // 地址：0x00, 0x04, 0x08, 0x0C, 0x10
         wdata[i] = $urandom();
-        apb_write(addr[i], wdata[i]);
+        sjtag2apb_write(addr[i], wdata[i]);
         `uvm_info("BYPASS",
           $sformatf("写入 addr=0x%08x data=0x%08x", addr[i], wdata[i]), UVM_HIGH)
       end
@@ -48,7 +48,7 @@ class sjtag2apb_bypass_seq extends sjtag2apb_tb_base_seq;
 
     // 阶段 2：读回验证（复位后重新进入 APB_ACCESS 模式）
     for (int i = 0; i < 5; i++) begin
-      apb_read(addr[i], rdata);
+      sjtag2apb_read(addr[i], rdata);
       if (rdata !== wdata[i]) begin
         `uvm_error("BYPASS",
           $sformatf("读写不一致：addr=0x%08x 期望=0x%08x 实际=0x%08x",

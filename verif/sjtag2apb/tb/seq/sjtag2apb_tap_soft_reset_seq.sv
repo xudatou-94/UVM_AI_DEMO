@@ -26,7 +26,7 @@ class sjtag2apb_tap_soft_reset_seq extends sjtag2apb_tb_base_seq;
       repeat(n_ops) begin
         addr  = {$urandom() & 32'hFFFF_FFFC};
         wdata = $urandom();
-        apb_write(addr, wdata);
+        sjtag2apb_write(addr, wdata);
       end
 
       // 执行软复位

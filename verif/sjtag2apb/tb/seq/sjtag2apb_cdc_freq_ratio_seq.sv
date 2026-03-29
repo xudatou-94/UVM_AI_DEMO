@@ -37,8 +37,8 @@ class sjtag2apb_cdc_freq_ratio_seq extends sjtag2apb_tb_base_seq;
       addr  = {$urandom()} & 32'hFFFF_FFFC;
       wdata = $urandom();
 
-      apb_write(addr, wdata);
-      apb_read(addr, rdata);
+      sjtag2apb_write(addr, wdata);
+      sjtag2apb_read(addr, rdata);
 
       if (rdata !== wdata) begin
         fail_cnt++;

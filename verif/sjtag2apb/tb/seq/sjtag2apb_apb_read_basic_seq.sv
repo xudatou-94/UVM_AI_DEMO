@@ -55,7 +55,7 @@ class sjtag2apb_apb_read_basic_seq extends sjtag2apb_tb_base_seq;
 
     // 逐一读取并校验
     for (int i = 0; i < 10; i++) begin
-      apb_read(preload_addr[i], rdata);
+      sjtag2apb_read(preload_addr[i], rdata);
       if (rdata !== preload_data[i]) begin
         fail_cnt++;
         `uvm_error("APB_READ_BASIC",

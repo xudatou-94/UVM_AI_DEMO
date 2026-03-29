@@ -29,13 +29,13 @@ class sjtag2apb_tap_hard_reset_seq extends sjtag2apb_tb_base_seq;
 
       // 执行若干 JTAG 操作使 TAP 进入非 IDLE 状态
       case ($urandom_range(0, 2))
-        0: apb_write(addr, wdata);                      // TAP 经历完整写周期
+        0: sjtag2apb_write(addr, wdata);                      // TAP 经历完整写周期
         1: begin
-             apb_write(addr, wdata);
-             apb_write(addr + 4, $urandom());            // 连续两次写
+             sjtag2apb_write(addr, wdata);
+             sjtag2apb_write(addr + 4, $urandom());            // 连续两次写
            end
         2: begin
-             apb_write(addr, wdata);
+             sjtag2apb_write(addr, wdata);
              void'(1); // 只写不读，保留 TAP 在 RTI
            end
       endcase
