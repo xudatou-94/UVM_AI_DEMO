@@ -1,15 +1,20 @@
 # sjtag2apb 激励运行指南
 
-所有命令均在 `scripts/` 目录下执行，通过 `Makefile` 统一管理。
+支持两种工作目录：
+
+- **模块目录**（推荐单模块开发调试）：在 `verif/sjtag2apb/` 下直接执行，`PROJ` 自动推导，无需手动指定
+- **scripts 目录**（多模块统一管理）：在 `scripts/` 下执行，需显式传入 `PROJ=sjtag2apb`
+
+以下示例均以**模块目录**为工作目录：
 
 ```bash
-cd scripts/
+cd verif/sjtag2apb/
 ```
 
 ## 环境初始化
 
 ```bash
-source setup.sh
+source ../../scripts/setup.sh
 ```
 
 ---
@@ -143,4 +148,4 @@ make debug PROJ=sjtag2apb TC=sjtag2apb_apb_slverr_test
 make help
 ```
 
-> 以上命令均在 `scripts/` 目录下执行。
+> 若在 `scripts/` 目录下执行，所有命令需额外加上 `PROJ=sjtag2apb`，例如 `make run PROJ=sjtag2apb TC=xxx`。
