@@ -1,30 +1,33 @@
 // =============================================================================
 // axi_monitor_regfile.sv
-// APB 寄存器文件：软件配置/状态读写接口
+// APB 寄存器文件
 //
 // 寄存器地址映射（APB 地址 12bit）：
 //
-// PMU 区域（0x000 ~ 0x01C）：
+// PMU 区域（0x000 ~ 0x024）：
 //   0x000  PMU_CTRL       [0]=pmu_en（RW）
 //   0x004  PMU_PERIOD     [31:0]（RW，默认 1000）
-//   0x008  PMU_AW_CNT     [31:0]（RO，AW 通道快照）
-//   0x00C  PMU_W_CNT      [31:0]（RO，W  通道快照）
-//   0x010  PMU_B_CNT      [31:0]（RO，B  通道快照）
-//   0x014  PMU_AR_CNT     [31:0]（RO，AR 通道快照）
-//   0x018  PMU_R_CNT      [31:0]（RO，R  通道快照）
+//   0x008  PMU_AW_CNT     [31:0]（RO）
+//   0x00C  PMU_W_CNT      [31:0]（RO）
+//   0x010  PMU_B_CNT      [31:0]（RO）
+//   0x014  PMU_AR_CNT     [31:0]（RO）
+//   0x018  PMU_R_CNT      [31:0]（RO）
+//   0x01C  PMU_B_ERR_CNT  [31:0]（RO，BRESP 错误快照）
+//   0x020  PMU_R_ERR_CNT  [31:0]（RO，RRESP 错误快照）
 //
-// Trace 区域（0x100 ~ 0x128）：
-//   0x100  TRACE_CTRL     [0]=trace_en（RW），[1]=trace_clr（W1P，自清）
+// Trace 区域（0x100 ~ 0x12C）：
+//   0x100  TRACE_CTRL       [0]=trace_en（RW），[1]=trace_clr（W1P）
 //   0x104  TRACE_COND_FIELD [2:0]（RW）
 //   0x108  TRACE_COND_OP    [2:0]（RW）
 //   0x10C  TRACE_COND_VAL   [31:0]（RW）
-//   0x110  TRACE_STATUS   [0]=empty，[6:1]=count，[7]=full（RO）
-//   0x114  TRACE_RD_CMD   [0]=rd_req（W1P，自清）
-//   0x118  TRACE_RD_ADDR  [31:0]（RO）
-//   0x11C  TRACE_RD_DATA  [31:0]（RO）
-//   0x120  TRACE_RD_ID    [7:0]（RO）
-//   0x124  TRACE_RD_BURST [1:0]（RO）
-//   0x128  TRACE_RD_OSD   [7:0]（RO，outstanding）
+//   0x110  TRACE_STATUS     [0]=empty，[6:1]=count，[7]=full（RO）
+//   0x114  TRACE_RD_CMD     [0]=rd_req（W1P）
+//   0x118  TRACE_RD_ADDR    [31:0]（RO）
+//   0x11C  TRACE_RD_DATA    [31:0]（RO）
+//   0x120  TRACE_RD_ID      [7:0]（RO）
+//   0x124  TRACE_RD_BURST   [1:0]（RO）
+//   0x128  TRACE_RD_OSD     [7:0]（RO，outstanding）
+//   0x12C  TRACE_CH_SEL     [N_CH_W-1:0]（RW，通道选择）
 // =============================================================================
 module axi_monitor_regfile
   import axi_monitor_pkg::*;
@@ -46,12 +49,14 @@ module axi_monitor_regfile
   output logic        pmu_en,
   output logic [31:0] pmu_period,
 
-  // PMU 状态输入（来自 PMU 模块快照寄存器）
+  // PMU 状态输入
   input  logic [PMU_CNT_W-1:0] snap_aw_cnt,
   input  logic [PMU_CNT_W-1:0] snap_w_cnt,
   input  logic [PMU_CNT_W-1:0] snap_b_cnt,
   input  logic [PMU_CNT_W-1:0] snap_ar_cnt,
   input  logic [PMU_CNT_W-1:0] snap_r_cnt,
+  input  logic [PMU_CNT_W-1:0] snap_b_err_cnt,
+  input  logic [PMU_CNT_W-1:0] snap_r_err_cnt,
 
   // Trace 配置输出
   output logic          trace_en,
@@ -59,8 +64,9 @@ module axi_monitor_regfile
   output trace_field_e  cond_field,
   output trace_op_e     cond_op,
   output logic [31:0]   cond_val,
+  output logic [N_CH_W-1:0] ch_sel,
 
-  // Trace 状态输入（来自 Trace 模块）
+  // Trace 状态输入
   input  logic                   sram_empty,
   input  logic [TRACE_PTR_W:0]   sram_count,
   input  logic                   sram_full,
@@ -80,6 +86,8 @@ module axi_monitor_regfile
   localparam logic [11:0] PMU_B_CNT        = 12'h010;
   localparam logic [11:0] PMU_AR_CNT       = 12'h014;
   localparam logic [11:0] PMU_R_CNT        = 12'h018;
+  localparam logic [11:0] PMU_B_ERR_CNT    = 12'h01C;
+  localparam logic [11:0] PMU_R_ERR_CNT    = 12'h020;
 
   localparam logic [11:0] TRACE_CTRL       = 12'h100;
   localparam logic [11:0] TRACE_COND_FIELD = 12'h104;
@@ -92,13 +100,13 @@ module axi_monitor_regfile
   localparam logic [11:0] TRACE_RD_ID      = 12'h120;
   localparam logic [11:0] TRACE_RD_BURST   = 12'h124;
   localparam logic [11:0] TRACE_RD_OSD     = 12'h128;
+  localparam logic [11:0] TRACE_CH_SEL     = 12'h12C;
 
   // -------------------------------------------------------------------------
-  // APB 写/读使能（ACCESS 相）
+  // APB 写使能
   // -------------------------------------------------------------------------
-  logic apb_wr, apb_rd;
-  assign apb_wr = psel & penable &  pwrite;
-  assign apb_rd = psel & penable & ~pwrite;
+  logic apb_wr;
+  assign apb_wr = psel & penable & pwrite;
 
   // -------------------------------------------------------------------------
   // 可写寄存器
@@ -106,11 +114,12 @@ module axi_monitor_regfile
   logic        r_pmu_en;
   logic [31:0] r_pmu_period;
   logic        r_trace_en;
-  logic        r_trace_clr;    // W1P 自清
+  logic        r_trace_clr;
   logic [2:0]  r_cond_field;
   logic [2:0]  r_cond_op;
   logic [31:0] r_cond_val;
-  logic        r_rd_req;       // W1P 自清
+  logic        r_rd_req;
+  logic [N_CH_W-1:0] r_ch_sel;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -122,8 +131,9 @@ module axi_monitor_regfile
       r_cond_op    <= '0;
       r_cond_val   <= '0;
       r_rd_req     <= 1'b0;
+      r_ch_sel     <= '0;
     end else begin
-      // W1P 自清（优先级低于 APB 写）
+      // W1P 自清
       r_trace_clr <= 1'b0;
       r_rd_req    <= 1'b0;
 
@@ -133,12 +143,13 @@ module axi_monitor_regfile
           PMU_PERIOD:       r_pmu_period <= pwdata;
           TRACE_CTRL: begin
                             r_trace_en  <= pwdata[0];
-                            r_trace_clr <= pwdata[1];  // 下一拍自清
+                            r_trace_clr <= pwdata[1];
           end
           TRACE_COND_FIELD: r_cond_field <= pwdata[2:0];
           TRACE_COND_OP:    r_cond_op    <= pwdata[2:0];
           TRACE_COND_VAL:   r_cond_val   <= pwdata;
-          TRACE_RD_CMD:     r_rd_req     <= pwdata[0];  // 下一拍自清
+          TRACE_RD_CMD:     r_rd_req     <= pwdata[0];
+          TRACE_CH_SEL:     r_ch_sel     <= pwdata[N_CH_W-1:0];
           default: ;
         endcase
       end
@@ -158,6 +169,8 @@ module axi_monitor_regfile
       PMU_B_CNT:        prdata = snap_b_cnt;
       PMU_AR_CNT:       prdata = snap_ar_cnt;
       PMU_R_CNT:        prdata = snap_r_cnt;
+      PMU_B_ERR_CNT:    prdata = snap_b_err_cnt;
+      PMU_R_ERR_CNT:    prdata = snap_r_err_cnt;
       TRACE_CTRL:       prdata = {30'b0, r_trace_clr, r_trace_en};
       TRACE_COND_FIELD: prdata = {29'b0, r_cond_field};
       TRACE_COND_OP:    prdata = {29'b0, r_cond_op};
@@ -169,11 +182,11 @@ module axi_monitor_regfile
       TRACE_RD_ID:      prdata = {24'b0, rd_entry.id};
       TRACE_RD_BURST:   prdata = {30'b0, rd_entry.burst};
       TRACE_RD_OSD:     prdata = {24'b0, rd_entry.outstanding};
+      TRACE_CH_SEL:     prdata = 32'(r_ch_sel);
       default:          prdata = '0;
     endcase
   end
 
-  // APB 无等待状态，无错误
   assign pready  = 1'b1;
   assign pslverr = 1'b0;
 
@@ -187,6 +200,7 @@ module axi_monitor_regfile
   assign cond_field= trace_field_e'(r_cond_field);
   assign cond_op   = trace_op_e'(r_cond_op);
   assign cond_val  = r_cond_val;
+  assign ch_sel    = r_ch_sel;
   assign rd_req    = r_rd_req;
 
 endmodule

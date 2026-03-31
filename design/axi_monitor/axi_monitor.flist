@@ -1,11 +1,12 @@
 // =============================================================================
 // axi_monitor.flist
-// AXI Monitor RTL 文件列表（编译顺序：pkg → 子模块 → 顶层）
+// 编译顺序：pkg → CDC → 子模块 → 顶层
 // =============================================================================
 
 +incdir+${REPO_ROOT}/design/axi_monitor
 
 ${REPO_ROOT}/design/axi_monitor/axi_monitor_pkg.sv
+${REPO_ROOT}/design/axi_monitor/axi_ch_cdc.sv
 ${REPO_ROOT}/design/axi_monitor/axi_monitor_pmu.sv
 ${REPO_ROOT}/design/axi_monitor/axi_monitor_trace.sv
 ${REPO_ROOT}/design/axi_monitor/axi_monitor_regfile.sv
