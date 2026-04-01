@@ -28,7 +28,7 @@ class sjtag2apb_random_regression_seq extends sjtag2apb_tb_base_seq;
     int unsigned pass_cnt  = 0;
     int unsigned fail_cnt  = 0;
     // PSLVERR 注入：约 5% 概率，每 20 笔触发一次
-    logic [31:0] pslverr_addr = 32'hERR0_0000;
+    logic [31:0] pslverr_addr = 32'hEE00_0000;
     bit          pslverr_active = 0;
 
     // 从 plusarg 读取事务数量
