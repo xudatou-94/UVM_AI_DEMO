@@ -19,12 +19,6 @@
 class sjtag2apb_coverage extends uvm_subscriber #(apb_seq_item);
   `uvm_component_utils(sjtag2apb_coverage)
 
-  // --------------------------------------------------------------------------
-  // analysis import 声明宏（为两个不同类型定义各自的 _decl）
-  // --------------------------------------------------------------------------
-  `uvm_analysis_imp_decl(_sjtag)
-  `uvm_analysis_imp_decl(_apb)
-
   // SJTAG 事务的 analysis import
   uvm_analysis_imp_sjtag #(sjtag_seq_item, sjtag2apb_coverage) sjtag_export;
   // APB 事务的 analysis import

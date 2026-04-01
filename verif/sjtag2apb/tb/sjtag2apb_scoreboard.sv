@@ -16,7 +16,6 @@ class sjtag2apb_scoreboard extends uvm_scoreboard;
   // --------------------------------------------------------------------------
   // analysis import：接收来自 APB monitor 的事务
   // --------------------------------------------------------------------------
-  `uvm_analysis_imp_decl(_apb)
   uvm_analysis_imp_apb #(apb_seq_item, sjtag2apb_scoreboard) apb_export;
 
   // --------------------------------------------------------------------------
