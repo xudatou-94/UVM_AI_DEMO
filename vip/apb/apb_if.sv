@@ -120,11 +120,11 @@ interface apb_if #(
   endproperty
 
   assert property (p_setup_penable)
-    else `uvm_error("APB_IF", "APB 违例：SETUP 阶段 PENABLE 不为 0")
+    else $error("APB_IF: APB 违例：SETUP 阶段 PENABLE 不为 0");
   assert property (p_access_penable)
-    else `uvm_error("APB_IF", "APB 违例：ACCESS 阶段 PENABLE 未拉高")
+    else $error("APB_IF: APB 违例：ACCESS 阶段 PENABLE 未拉高");
   assert property (p_addr_stable)
-    else `uvm_error("APB_IF", "APB 违例：事务期间 PADDR 发生变化")
+    else $error("APB_IF: APB 违例：事务期间 PADDR 发生变化");
 `endif
 
 endinterface : apb_if
