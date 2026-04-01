@@ -35,8 +35,7 @@ class sjtag2apb_tap_hard_reset_seq extends sjtag2apb_tb_base_seq;
              sjtag2apb_write(addr + 4, $urandom());            // 连续两次写
            end
         2: begin
-             sjtag2apb_write(addr, wdata);
-             void'(1); // 只写不读，保留 TAP 在 RTI
+             sjtag2apb_write(addr, wdata); // 只写不读，保留 TAP 在 RTI
            end
       endcase
 
