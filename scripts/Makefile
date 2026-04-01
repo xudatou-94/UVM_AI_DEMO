@@ -34,7 +34,8 @@ WAVE        ?= 1             # 1=转储 FSDB 波形，0=不转储
 WAVE_SCOPE  ?=               # 波形转储范围（空=全量；如 tb_top.u_dut）
 CODE_COV    ?= 0             # 1=开启代码覆盖率（line/cond/fsm/tgl/branch）
 FUNC_COV    ?= 0             # 1=开启功能覆盖率（UVM covergroup）
-CASE_TIMEOUT?= 3600          # 单条激励超时秒数（默认 1 小时）
+# 单条激励超时秒数（默认 1 小时）
+CASE_TIMEOUT?= 3600
 AUTO_DEBUG  ?= 0             # 1=仿真结束后自动打开波形（需同时 WAVE=1）
 JOBS        ?= 1             # 本地并行作业数
 SUBMIT      ?= local         # 提交方式：local / lsf / sge
