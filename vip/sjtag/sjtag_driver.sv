@@ -74,22 +74,20 @@ class sjtag_driver extends uvm_driver #(sjtag_seq_item);
     tap_goto_rti();
 
     forever begin
-      sjtag_seq_item req, rsp;
+      sjtag_seq_item req;
       seq_item_port.get_next_item(req);
       `uvm_info("SJTAG_DRV", $sformatf("执行: %s", req.convert2string()), UVM_MEDIUM)
 
-      rsp = sjtag_seq_item::type_id::create("rsp");
-      rsp.set_id_info(req);   // 正确复制 sequence_id / transaction_id
-
+      // 直接回写到 req，sequence 在 finish_item() 返回后即可读到更新值
       case (req.op)
         sjtag_seq_item::SJTAG_RESET     : do_tap_reset();
         sjtag_seq_item::SJTAG_APB_WRITE : do_apb_write(req.addr, req.wdata);
-        sjtag_seq_item::SJTAG_APB_READ  : do_apb_read(req.addr, rsp.rdata);
-        sjtag_seq_item::SJTAG_IDCODE    : do_idcode(rsp.rdata);
+        sjtag_seq_item::SJTAG_APB_READ  : do_apb_read(req.addr, req.rdata);
+        sjtag_seq_item::SJTAG_IDCODE    : do_idcode(req.rdata);
         default: `uvm_error("SJTAG_DRV", "未知操作类型")
       endcase
 
-      seq_item_port.item_done(rsp);
+      seq_item_port.item_done();  // 不带响应参数，避免响应队列积压
     end
   endtask
 
