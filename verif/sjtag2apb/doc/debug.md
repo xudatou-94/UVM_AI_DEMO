@@ -185,3 +185,74 @@ initial begin
   run_test();  // 时间 0 调用
 end
 ```
+
+---
+
+## 问题八：sjtag_driver 响应 item 的 sequence_id 为空
+
+**文件**：`vip/sjtag/sjtag_driver.sv`
+
+**错误信息**：
+```
+UVM_FATAL @ 900000: uvm_test_top.env.sjtag_agt.seqr [SQRPUT]
+Driver put a response with null sequence_id
+```
+
+**根因**：  
+driver 创建响应 item 后调用 `rsp.copy(req)`，`copy()` 只复制用户定义字段，不复制 UVM 框架内部的 `sequence_id` 和 `transaction_id`。调用 `item_done(rsp)` 时 sequencer 找不到对应的 sequence，触发 FATAL。
+
+**修复**：  
+将 `rsp.copy(req)` 替换为 `rsp.set_id_info(req)`，该接口专门用于将 request 的 ID 信息传递给 response：
+
+```systemverilog
+// 修复前
+rsp.copy(req);
+
+// 修复后
+rsp.set_id_info(req);
+```
+
+---
+
+## 问题九：`uvm_analysis_imp_decl` 置于类体内导致 write 回调不执行
+
+**文件**：`verif/sjtag2apb/tb/sjtag2apb_scoreboard.sv`、`sjtag2apb_coverage.sv`、`sjtag2apb_tb_pkg.sv`
+
+**现象**：  
+`sjtag2apb_scoreboard` 的 `write_apb` 回调函数未被调用，scoreboard 无任何比对输出。
+
+**根因**：  
+`uvm_analysis_imp_decl(_suffix)` 宏展开时会定义一个新的类 `uvm_analysis_imp_<suffix>`，该类必须在 **package 作用域**定义，放在类体内无法被同包其他类正确识别。  
+此外，`sjtag2apb_scoreboard` 和 `sjtag2apb_coverage` 均声明了 `uvm_analysis_imp_decl(_apb)`，在同一编译单元中重复定义同名类，导致类型冲突。
+
+**修复**：  
+将两个宏移至 `sjtag2apb_tb_pkg.sv` 的 package 顶部（所有类 include 之前），并从两个类体内删除：
+
+```systemverilog
+// sjtag2apb_tb_pkg.sv（package 顶部）
+`uvm_analysis_imp_decl(_apb)
+`uvm_analysis_imp_decl(_sjtag)
+```
+
+---
+
+## 问题十：apb_write_basic_seq 缺少回读，scoreboard 无法比对
+
+**文件**：`verif/sjtag2apb/tb/seq/sjtag2apb_apb_write_basic_seq.sv`
+
+**现象**：  
+激励只执行写操作，scoreboard 的影子存储器记录了写入值，但没有读事务触发，无法做任何数据比对，测试实际无校验效果。
+
+**修复**：  
+改为两阶段执行：先完成全部 20 次写操作并记录地址/数据，再逐一回读，scoreboard 收到读事务时自动与影子存储器比对：
+
+```systemverilog
+// 第一阶段：写入
+for (int i = 0; i < 20; i++) begin
+  sjtag2apb_write(addr_list[i], wdata_list[i]);
+end
+// 第二阶段：回读（触发 scoreboard 比对）
+for (int i = 0; i < 20; i++) begin
+  sjtag2apb_read(addr_list[i], rdata);
+end
+```
