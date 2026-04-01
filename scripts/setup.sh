@@ -51,13 +51,10 @@ case "${_SITE}" in
         export VCS_HOME="/usr/Synopsys/vcs/Q-2020.03-SP2-7"
         # ---------- Verdi ----------
         export VERDI_HOME="/usr/Synopsys/verdi/R-2020.12-SP1"
-        # ---------- License ----------
-        export SNPSLMD_LICENSE_FILE="27020@license-server"     # 修改为实际 License 服务器
         ;;
     site_a)
         export VCS_HOME="/eda/synopsys/vcs-mx/O-2018.09"
         export VERDI_HOME="/eda/synopsys/verdi/S-2021.09"
-        export SNPSLMD_LICENSE_FILE="27020@lic-server-a"
         ;;
     # 按需添加更多站点配置
     *)
