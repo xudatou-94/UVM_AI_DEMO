@@ -67,9 +67,12 @@ else
 fi
 
 # 覆盖率收集
-if [ "${COV}" = "1" ]; then
-    VCS_CMD+=" -cm line+cond+fsm+tgl+branch"     # 覆盖率类型
+if [ "${CODE_COV}" = "1" ]; then
+    VCS_CMD+=" -cm line+cond+fsm+tgl+branch"     # 代码覆盖率类型
     VCS_CMD+=" -cm_dir ${COMPILE_DIR}/coverage"   # 覆盖率数据目录
+fi
+if [ "${FUNC_COV}" = "1" ]; then
+    VCS_CMD+=" -ntb_opts cover"                  # 功能覆盖率（UVM covergroup）
 fi
 
 #-----------------------------------------------------------------------------
