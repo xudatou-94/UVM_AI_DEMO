@@ -152,8 +152,8 @@ class sjtag2apb_coverage extends uvm_subscriber #(apb_seq_item);
   // write：uvm_subscriber 基类要求实现，转发到 write_apb
   // （apb_export 已通过 `uvm_analysis_imp_decl 独立声明，此函数为兼容基类）
   // --------------------------------------------------------------------------
-  function void write(apb_seq_item item);
-    write_apb(item);
+  function void write(apb_seq_item t);
+    write_apb(t);
   endfunction
 
 endclass : sjtag2apb_coverage
