@@ -1,0 +1,19 @@
+// =============================================================================
+// axi.flist  AXI4 VIP 文件列表
+//
+// 使用方式（VCS）：
+//   vcs -f ${REPO_ROOT}/vip/axi/axi.flist ...
+//
+// 注意：axi_vip_pkg.sv 内部已通过 `include 引入所有 .sv 类文件，
+//       因此编译列表中只需显式列出 package 和 interface。
+// =============================================================================
+
+// ---- 基础类型 package ----
++incdir+${REPO_ROOT}/vip/axi
+${REPO_ROOT}/vip/axi/axi_pkg.sv
+
+// ---- 接口 ----
+${REPO_ROOT}/vip/axi/axi_if.sv
+
+// ---- VIP package（包含所有 UVM 组件）----
+${REPO_ROOT}/vip/axi/axi_vip_pkg.sv
