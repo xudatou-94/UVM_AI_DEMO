@@ -86,53 +86,48 @@ module tb_top;
   );
 
   // --------------------------------------------------------------------------
-  // 初始化 & UVM 启动
+  // 复位序列（独立 initial，与 run_test 并行）
+  // --------------------------------------------------------------------------
+  initial begin
+    trst_n  = 1'b0;
+    presetn = 1'b0;
+    // PCLK 域：10 个 PCLK 后释放 PRESETn
+    repeat(10) @(posedge pclk);
+    presetn = 1'b1;
+    // TCK 域：再 5 个 TCK 后释放 TRST_N
+    repeat(5) @(posedge tck);
+    trst_n = 1'b1;
+    @(posedge tck);
+  end
+
+  // --------------------------------------------------------------------------
+  // UVM 启动（必须在时间 0 调用 run_test）
   // --------------------------------------------------------------------------
   initial begin
     int unsigned timeout_s;
 
-    // 读取时钟和超时配置
+    // 读取时钟和超时配置（不消耗仿真时间）
     void'($value$plusargs("TCK_HALF_NS=%0d",  tck_half_ns));
     void'($value$plusargs("PCLK_HALF_NS=%0d", pclk_half_ns));
     timeout_s = 1800;
     void'($value$plusargs("CASE_TIMEOUT=%0d", timeout_s));
 
-    // ---- 复位序列 ----
-    // 先拉低两路复位
-    trst_n  = 1'b0;
-    presetn = 1'b0;
-
-    // PCLK 域：等待 10 个 PCLK 后释放 PRESETn
-    repeat(10) @(posedge pclk);
-    presetn = 1'b1;
-
-    // TCK 域：再等待 5 个 TCK 后释放 TRST_N
-    repeat(5) @(posedge tck);
-    trst_n = 1'b1;
-    @(posedge tck);
-
     // ---- 将接口传递给 UVM config_db ----
-    // SJTAG VIP driver/monitor 使用 "vif" key
-    uvm_config_db #(virtual sjtag_if)::set(null, "uvm_test_top.*", "vif", sjtag_if_inst);
-    // APB VIP monitor 使用 "vif" key
-    uvm_config_db #(virtual apb_if)::set(null, "uvm_test_top.*", "vif", apb_if_inst);
-    // APB slave model 使用 "apb_vif" key
-    uvm_config_db #(virtual apb_if)::set(null, "uvm_test_top.*", "apb_vif", apb_if_inst);
-
-    // 将 TCK 半周期传递给 env（env 再传给 SJTAG agent cfg）
+    uvm_config_db #(virtual sjtag_if)::set(null, "uvm_test_top.*", "vif",     sjtag_if_inst);
+    uvm_config_db #(virtual apb_if)::set(null,   "uvm_test_top.*", "vif",     apb_if_inst);
+    uvm_config_db #(virtual apb_if)::set(null,   "uvm_test_top.*", "apb_vif", apb_if_inst);
     uvm_config_db #(int unsigned)::set(null, "uvm_test_top", "tck_half_period_ns", tck_half_ns);
 
-    // ---- 超时看门狗 fork ----
+    // ---- 超时看门狗 ----
     fork
       begin
-        // 在独立 fork 中等待超时，超时则终止仿真
         #(timeout_s * 1s);
         `uvm_fatal("TIMEOUT",
           $sformatf("仿真超时：已运行 %0d 秒，请检查是否存在死锁", timeout_s))
       end
     join_none
 
-    // ---- 启动 UVM 仿真 ----
+    // ---- 启动 UVM 仿真（时间 0）----
     run_test();
   end
 
