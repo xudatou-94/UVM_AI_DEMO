@@ -48,9 +48,9 @@ echo -e "${_GREEN}[SETUP] 初始化 EDA 环境 (site: ${_SITE})${_NC}"
 case "${_SITE}" in
     default)
         # ---------- VCS 2020 ----------
-        export VCS_HOME="/tools/synopsys/vcs/O-2018.09-SP2"   # 修改为实际路径
+        export VCS_HOME="/usr/Synopsys/vcs/Q-2020.03-SP2-7"
         # ---------- Verdi ----------
-        export VERDI_HOME="/tools/synopsys/verdi/S-2021.09"    # 修改为实际路径
+        export VERDI_HOME="/usr/Synopsys/verdi/R-2020.12-SP1"
         # ---------- License ----------
         export SNPSLMD_LICENSE_FILE="27020@license-server"     # 修改为实际 License 服务器
         ;;
