@@ -79,7 +79,7 @@ class sjtag_driver extends uvm_driver #(sjtag_seq_item);
       `uvm_info("SJTAG_DRV", $sformatf("执行: %s", req.convert2string()), UVM_MEDIUM)
 
       rsp = sjtag_seq_item::type_id::create("rsp");
-      rsp.copy(req);
+      rsp.set_id_info(req);   // 正确复制 sequence_id / transaction_id
 
       case (req.op)
         sjtag_seq_item::SJTAG_RESET     : do_tap_reset();
