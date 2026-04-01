@@ -26,7 +26,7 @@ class sjtag2apb_apb_slverr_seq extends sjtag2apb_tb_base_seq;
     // ---- 场景 1：写事务触发 PSLVERR ----
     `uvm_info("APB_SLVERR", "场景 1：写事务触发 PSLVERR", UVM_MEDIUM)
     configure_slave_err(err_addr, 1);
-    sjtag2apb_write(err_addr, 32'hBAD_DATA);   // PSLVERR 触发，DUT 应不死锁
+    sjtag2apb_write(err_addr, 32'hBAD_0000);   // PSLVERR 触发，DUT 应不死锁
     wait_apb_cycles(5);
 
     // ---- 场景 2：读事务触发 PSLVERR ----
