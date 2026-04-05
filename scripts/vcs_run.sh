@@ -71,17 +71,19 @@ if [ ! -f "${SIMV}" ]; then
 fi
 
 #-----------------------------------------------------------------------------
-# 处理随机种子
+# 处理随机种子：计算 SEED_DIR 用于路径拼接，SEED 保持原值传给 simv
 #-----------------------------------------------------------------------------
 if [ "${SEED}" = "random" ]; then
-    SEED=$(tr -dc '0-9' < /dev/urandom | head -c 9)
-    SEED=$((10#${SEED}))  # 去除前导零，确保纯十进制整数
+    SEED_DIR=$(tr -dc '0-9' < /dev/urandom | head -c 9 | sed 's/^0*//')
+    SEED_DIR="${SEED_DIR:-1}"   # 防止全为 0 时变成空字符串
+else
+    SEED_DIR="${SEED}"
 fi
 
 #-----------------------------------------------------------------------------
 # 仿真输出目录（按 测试名_种子 隔离，每次运行结果独立存放）
 #-----------------------------------------------------------------------------
-SIM_DIR="${OUTPUT_ROOT}/${PROJ}/sim/${TC}_${SEED}"
+SIM_DIR="${OUTPUT_ROOT}/${PROJ}/sim/${TC}_${SEED_DIR}"
 SIM_LOG="${SIM_DIR}/${TC}.log"
 FSDB_FILE="${SIM_DIR}/${TC}.fsdb"
 RESULT_JSON="${SIM_DIR}/result.json"
@@ -99,7 +101,7 @@ START_TS=$(date +%s)
 echo -e "${GREEN}[INFO] ===== 开始仿真 =====${NC}"
 echo -e "[INFO] 项目:     ${PROJ}"
 echo -e "[INFO] 测试:     ${TC}"
-echo -e "[INFO] 种子:     ${SEED}"
+echo -e "[INFO] 种子:     ${SEED_DIR}"
 echo -e "[INFO] 超时:     ${CASE_TIMEOUT}s"
 [ -n "${CASE_ID}"     ] && echo -e "[INFO] Case ID:  ${CASE_ID}"
 [ -n "${CASE_SEQ}"    ] && echo -e "[INFO] Seq:      ${CASE_SEQ}"
@@ -208,7 +210,7 @@ else
     echo -e "${RED}[INFO] UVM_FATAL: ${UVM_FATAL}  UVM_ERROR: ${UVM_ERROR}${NC}"
 fi
 
-echo -e "[INFO] 测试: ${TC}  种子: ${SEED}  耗时: ${DURATION}s"
+echo -e "[INFO] 测试: ${TC}  种子: ${SEED_DIR}  耗时: ${DURATION}s"
 [ -n "${CASE_ID}" ] && echo -e "[INFO] Case ID: ${CASE_ID}"
 echo -e "[INFO] 仿真日志: ${SIM_LOG}"
 if [ "${WAVE}" = "1" ] && [ -f "${FSDB_FILE}" ]; then
@@ -224,7 +226,7 @@ import json, datetime
 result = {
     "case_id":   "${CASE_ID}",
     "case_name": "${TC}",
-    "seed":      ${SEED},
+    "seed":      ${SEED_DIR},
     "passed":    ${PASSED} == 1,
     "uvm_fatal": ${UVM_FATAL},
     "uvm_error": ${UVM_ERROR},
