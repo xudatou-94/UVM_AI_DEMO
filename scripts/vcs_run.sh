@@ -75,8 +75,9 @@ fi
 #-----------------------------------------------------------------------------
 SEED="${SEED%% *}"   # trim 尾部空格（防止 Makefile 行内注释带入空格）
 if [[ "${SEED}" == "random" ]]; then
-    SEED_DIR=$(tr -dc '0-9' < /dev/urandom | head -c 9 | sed 's/^0*//')
-    SEED_DIR="${SEED_DIR:-1}"   # 防止全为 0 时变成空字符串
+    # od 读 4 字节转无符号十进制，不产生 SIGPIPE
+    SEED_DIR=$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n')
+    SEED_DIR="${SEED_DIR:-1}"
 else
     SEED_DIR="${SEED}"
 fi
