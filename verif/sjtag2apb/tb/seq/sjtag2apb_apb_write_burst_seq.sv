@@ -38,13 +38,9 @@ class sjtag2apb_apb_write_burst_seq extends sjtag2apb_tb_base_seq;
     `uvm_info("APB_WRITE_BURST",
       $sformatf("开始 burst 写：共 %0d 笔", n), UVM_MEDIUM)
 
-    // 连续写入 N 笔（无额外延迟，背靠背）
+    // 每笔写完立即回读校验，slave 只保存一拍数据
     for (int i = 0; i < n; i++) begin
       sjtag2apb_write(addr_arr[i], data_arr[i]);
-    end
-
-    // 逐一读回校验
-    for (int i = 0; i < n; i++) begin
       sjtag2apb_read(addr_arr[i], rdata);
       if (rdata !== data_arr[i]) begin
         fail_cnt++;

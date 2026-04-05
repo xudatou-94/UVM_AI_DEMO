@@ -14,35 +14,37 @@ class sjtag2apb_apb_write_basic_seq extends sjtag2apb_tb_base_seq;
   endfunction
 
   task body();
-    logic [31:0] addr_list[20];
-    logic [31:0] wdata_list[20];
-    logic [31:0] rdata;
+    logic [31:0] addr, wdata, rdata;
+    int unsigned pass_cnt = 0, fail_cnt = 0;
 
     `uvm_info("APB_WRITE_BASIC", "=== TC sjtag2apb_0005: APB 基本写操作 ===", UVM_NONE)
 
     do_reset();
 
-    // 第一阶段：执行 20 次随机写操作，记录地址/数据
-    for (int i = 0; i < 20; i++) begin
-      addr_list[i]  = {$urandom()} & 32'hFFFF_FFFC;  // 4 字节对齐
-      wdata_list[i] = $urandom();
-      sjtag2apb_write(addr_list[i], wdata_list[i]);
-      `uvm_info("APB_WRITE_BASIC",
-        $sformatf("写：addr=0x%08x data=0x%08x", addr_list[i], wdata_list[i]), UVM_HIGH)
+    // 每次写完立即回读，slave 只保存一拍数据
+    repeat(20) begin
+      addr  = {$urandom()} & 32'hFFFF_FFFC;
+      wdata = $urandom();
+
+      sjtag2apb_write(addr, wdata);
+      sjtag2apb_read(addr, rdata);
+
+      if (rdata !== wdata) begin
+        fail_cnt++;
+        `uvm_error("APB_WRITE_BASIC",
+          $sformatf("读写不一致：addr=0x%08x 写=0x%08x 读=0x%08x", addr, wdata, rdata))
+      end else begin
+        pass_cnt++;
+        `uvm_info("APB_WRITE_BASIC",
+          $sformatf("一致：addr=0x%08x data=0x%08x", addr, rdata), UVM_HIGH)
+      end
     end
 
     wait_apb_cycles(5);
 
-    // 第二阶段：逐一回读，由 scoreboard 比对写入值与读回值
-    for (int i = 0; i < 20; i++) begin
-      sjtag2apb_read(addr_list[i], rdata);
-      `uvm_info("APB_WRITE_BASIC",
-        $sformatf("读：addr=0x%08x rdata=0x%08x", addr_list[i], rdata), UVM_HIGH)
-    end
-
-    wait_apb_cycles(10);
-
-    `uvm_info("APB_WRITE_BASIC", "=== TC sjtag2apb_0005 完成 ===", UVM_NONE)
+    `uvm_info("APB_WRITE_BASIC",
+      $sformatf("=== TC sjtag2apb_0005 完成：%0d 通过 / %0d 失败 ===",
+                pass_cnt, fail_cnt), UVM_NONE)
   endtask
 
 endclass : sjtag2apb_apb_write_basic_seq
