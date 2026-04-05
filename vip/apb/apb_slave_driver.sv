@@ -93,7 +93,7 @@ class apb_slave_driver extends uvm_component;
     rsp_port.get(rsp);
 
     // 进入 ACCESS 阶段（等待 PENABLE 拉高）
-    @(posedge vif.PCLK);
+    // @(posedge vif.PCLK);  // 暂时注释，时序待确认
 
     // 插入等待状态：PREADY=0
     if (rsp.wait_states > 0) begin
