@@ -26,20 +26,32 @@ REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 #-----------------------------------------------------------------------------
 # 用户可配置变量
 #-----------------------------------------------------------------------------
-PROJ        ?=               # 项目名称（verif/ 下的子目录名，必填）
-TC          ?= base_test     # UVM 测试类名（make run/all 使用）
-SEED        ?= random        # 随机种子，random 表示自动生成
-VERBOSITY   ?= UVM_MEDIUM    # UVM 打印级别
-WAVE        ?= 1             # 1=转储 FSDB 波形，0=不转储
-WAVE_SCOPE  ?=               # 波形转储范围（空=全量；如 tb_top.u_dut）
-CODE_COV    ?= 0             # 1=开启代码覆盖率（line/cond/fsm/tgl/branch）
-FUNC_COV    ?= 0             # 1=开启功能覆盖率（UVM covergroup）
+# 项目名称（verif/ 下的子目录名，必填）
+PROJ        ?=
+# UVM 测试类名（make run/all 使用）
+TC          ?= base_test
+# 随机种子，random 表示自动生成
+SEED        ?= random
+# UVM 打印级别
+VERBOSITY   ?= UVM_MEDIUM
+# 1=转储 FSDB 波形，0=不转储
+WAVE        ?= 1
+# 波形转储范围（空=全量；如 tb_top.u_dut）
+WAVE_SCOPE  ?=
+# 1=开启代码覆盖率（line/cond/fsm/tgl/branch）
+CODE_COV    ?= 0
+# 1=开启功能覆盖率（UVM covergroup）
+FUNC_COV    ?= 0
 # 单条激励超时秒数（默认 1 小时）
 CASE_TIMEOUT?= 3600
-AUTO_DEBUG  ?= 0             # 1=仿真结束后自动打开波形（需同时 WAVE=1）
-JOBS        ?= 1             # 本地并行作业数
-SUBMIT      ?= local         # 提交方式：local / lsf / sge
-GUI         ?= 0             # 1=以 GUI 模式打开调试工具
+# 1=仿真结束后自动打开波形（需同时 WAVE=1）
+AUTO_DEBUG  ?= 0
+# 本地并行作业数
+JOBS        ?= 1
+# 提交方式：local / lsf / sge
+SUBMIT      ?= local
+# 1=以 GUI 模式打开调试工具
+GUI         ?= 0
 
 # 回归过滤选项（make regress 使用）
 TAG         ?=               # 按 case_tag 过滤，多个标签用空格分隔
