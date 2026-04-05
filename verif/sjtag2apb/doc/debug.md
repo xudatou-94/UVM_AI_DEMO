@@ -256,3 +256,30 @@ for (int i = 0; i < 20; i++) begin
   sjtag2apb_read(addr_list[i], rdata);
 end
 ```
+
+---
+
+## 问题十一：SEED=random 时 SIM_DIR 路径含尾部空格
+
+**文件**：`scripts/vcs_run.sh`
+
+**现象**：  
+`SIM_DIR` 路径末尾含多余空格，导致基于 `SIM_DIR` 拼接的所有路径（日志、波形、result.json）均不合法，仿真目录创建失败。
+
+**根因**：  
+```bash
+SEED=$((RANDOM * RANDOM))
+```
+bash 的 `RANDOM` 变量在算术展开时会附带隐式换行符，两次展开相乘后换行符残留在变量值中，拼入 `SIM_DIR` 后产生尾部空格。此外 `RANDOM`（0–32767）相乘易溢出 32 位有符号整数，产生负数种子。
+
+**修复**：  
+改用 `/dev/urandom` 生成 9 位纯数字字符串，再用 `$((10#...))` 去除前导零：
+
+```bash
+# 修复前
+SEED=$((RANDOM * RANDOM))
+
+# 修复后
+SEED=$(tr -dc '0-9' < /dev/urandom | head -c 9)
+SEED=$((10#${SEED}))  # 去除前导零，确保纯十进制整数
+```
