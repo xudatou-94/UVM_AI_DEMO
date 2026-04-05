@@ -319,3 +319,65 @@ else
     SEED_DIR="${SEED}"
 fi
 ```
+
+---
+
+## 问题十三：make run Error 141（SIGPIPE）
+
+**文件**：`scripts/vcs_run.sh`
+
+**错误信息**：
+```
+make[1]: *** [run] Error 141
+```
+
+**根因**：  
+exit code 141 = 128 + 13（SIGPIPE）。`tr -dc '0-9' < /dev/urandom | head -c 9` 中 `head` 读够 9 字节后退出，`tr` 仍在向管道写入，收到 SIGPIPE 信号退出。脚本开头的 `set -euo pipefail` 将管道中任意命令的非零退出码视为脚本错误，触发 make 报 141。
+
+**修复**：  
+改用 `od` 直接从 `/dev/urandom` 读 4 字节转无符号十进制，无管道，不产生 SIGPIPE：
+```bash
+SEED_DIR=$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n')
+```
+
+---
+
+## 问题十四：FSDB 文件未生成 + vcs_debug.sh 路径与 vcs_run.sh 不一致
+
+**文件**：`verif/sjtag2apb/tb/tb_top.sv`、`scripts/vcs_debug.sh`
+
+**现象**：  
+仿真运行后没有 FSDB 波形文件生成；`make debug` 报 "X is not a fsdb file"，且 `vcs_debug.sh` 在找不到 FSDB 时因 `xargs` 空输入问题可能意外拿到错误文件。
+
+**根因**：  
+1. `tb_top.sv` 缺少 `$fsdbDumpvars` 调用。`+fsdbfile+` plusarg 传入了 FSDB 路径，但 TB 从未调用 Novas 系统任务启动转储，仿真结束后不会生成任何波形文件。  
+2. `vcs_debug.sh` 用 `${TC}_${SEED}` 拼接路径，而 `vcs_run.sh` 改用了 `${TC}_${SEED_DIR}`，两边不一致，导致精确路径匹配失败。  
+3. `find ... | xargs ls -t` 当 `find` 结果为空时，`xargs` 会以无参数方式运行 `ls -t`，列出当前目录，可能返回无关文件。
+
+**修复**：
+
+1. **tb_top.sv**：增加 FSDB dump initial 块：
+```systemverilog
+initial begin
+  string fsdb_file;
+  if ($value$plusargs("fsdbfile+%s", fsdb_file)) begin
+    $fsdbDumpfile(fsdb_file);
+    $fsdbDumpvars(0, tb_top);
+    $fsdbDumpSVA;
+  end
+end
+```
+
+2. **vcs_debug.sh**：改用 `SEED_DIR` 逻辑与 `vcs_run.sh` 保持一致，同时将 `find | xargs ls -t` 改为 `find | sort | tail -1` 消除空输入问题：
+```bash
+SEED="${SEED%% *}"
+if [[ "${SEED}" != "random" ]]; then
+    SEED_DIR="${SEED}"
+    FSDB_FILE="${SIM_BASE}/${TC}_${SEED_DIR}/${TC}.fsdb"
+fi
+# 兜底：find 最新 fsdb（无 xargs）
+if [ -z "${FSDB_FILE}" ] || [ ! -f "${FSDB_FILE}" ]; then
+    FSDB_FILE=$(find "${SIM_BASE}" -name "${TC}.fsdb" -type f 2>/dev/null \
+                | sort | tail -1)
+fi
+```
