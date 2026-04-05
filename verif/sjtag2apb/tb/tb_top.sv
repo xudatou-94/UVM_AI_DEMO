@@ -131,4 +131,17 @@ module tb_top;
     run_test();
   end
 
+  // --------------------------------------------------------------------------
+  // FSDB 波形转储（+DUMP_WAVE plusarg 触发）
+  // --------------------------------------------------------------------------
+  initial begin
+    string fsdb_file;
+    if ($value$plusargs("fsdbfile+%s", fsdb_file)) begin
+      $fsdbDumpfile(fsdb_file);
+      $fsdbDumpvars(0, tb_top);
+      $fsdbDumpSVA;
+      `uvm_info("TB_TOP", $sformatf("FSDB 转储已启动：%s", fsdb_file), UVM_NONE)
+    end
+  end
+
 endmodule : tb_top
