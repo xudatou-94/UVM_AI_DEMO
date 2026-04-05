@@ -186,7 +186,7 @@ if [ "${SIM_EXIT}" -eq 124 ]; then
 fi
 
 #-----------------------------------------------------------------------------
-# 仿真结果判定（扫描 UVM 报告行）
+# 仿真结果判定（只扫描 UVM Report catcher Summary 之前的日志内容）
 #-----------------------------------------------------------------------------
 echo ""
 echo "============================================================"
@@ -195,8 +195,11 @@ UVM_FATAL=0
 UVM_ERROR=0
 
 if [ -f "${SIM_LOG}" ]; then
-    UVM_FATAL=$(grep -c "UVM_FATAL" "${SIM_LOG}" 2>/dev/null || true)
-    UVM_ERROR=$(grep -c "UVM_ERROR" "${SIM_LOG}" 2>/dev/null || true)
+    # 截取 "UVM Report catcher Summary" 之前的内容，避免将汇总行中的
+    # "UVM_FATAL : 0" / "UVM_ERROR : 0" 误判为真实错误
+    LOG_BODY=$(sed '/UVM Report catcher Summary/Q' "${SIM_LOG}" 2>/dev/null)
+    UVM_FATAL=$(echo "${LOG_BODY}" | grep -c "UVM_FATAL" 2>/dev/null || true)
+    UVM_ERROR=$(echo "${LOG_BODY}" | grep -c "UVM_ERROR" 2>/dev/null || true)
 else
     echo -e "${RED}[FAIL] 仿真日志不存在，仿真可能异常退出${NC}"
 fi
