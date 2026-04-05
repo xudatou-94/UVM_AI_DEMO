@@ -283,3 +283,39 @@ SEED=$((RANDOM * RANDOM))
 SEED=$(tr -dc '0-9' < /dev/urandom | head -c 9)
 SEED=$((10#${SEED}))  # 去除前导零，确保纯十进制整数
 ```
+
+---
+
+## 问题十二：SEED=random 尾部空格导致条件判断失败（Makefile 行内注释问题）
+
+**文件**：`scripts/Makefile`、`scripts/vcs_run.sh`
+
+**现象**：  
+`SEED` 默认为 `random` 时，`vcs_run.sh` 中的条件判断始终不成立，`SEED_DIR` 未被正确生成，路径拼接仍然异常。
+
+**根因**：  
+Makefile 中变量赋值行带有行内注释：
+```makefile
+SEED        ?= random        # 随机种子，random 表示自动生成
+```
+注释前的空格被一并赋入变量值，`SEED` 实际为 `random        `（含尾部空格）。  
+此外 `vcs_run.sh` 中使用的是单 `=` 的 `[ ]` 写法，在 `[[ ]]` 下推荐使用 `==`。
+
+**修复**：
+
+1. **Makefile**：将所有变量的行内注释统一移至上一行，彻底消除空格污染（影响 `TC`、`SEED`、`VERBOSITY`、`WAVE` 等所有变量）：
+```makefile
+# 随机种子，random 表示自动生成
+SEED        ?= random
+```
+
+2. **vcs_run.sh**：`if` 判断改用 `[[ ]]` + `==`，同时对 `SEED` 做防御性 trim：
+```bash
+SEED="${SEED%% *}"          # trim 尾部空格
+if [[ "${SEED}" == "random" ]]; then
+    SEED_DIR=$(tr -dc '0-9' < /dev/urandom | head -c 9 | sed 's/^0*//')
+    SEED_DIR="${SEED_DIR:-1}"
+else
+    SEED_DIR="${SEED}"
+fi
+```
