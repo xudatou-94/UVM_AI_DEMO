@@ -1,2 +1,0 @@
-# Give dev user account root permissions in container
-dev ALL=(ALL) NOPASSWD:ALL

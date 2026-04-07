@@ -1,6 +1,0 @@
-# Find all targets that are incompatible with the specified platform
-# (i.e. host by default).
-def format(target):
-  if "IncompatiblePlatformProvider" in providers(target):
-    return target.label
-  return ""
