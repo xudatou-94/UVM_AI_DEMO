@@ -1,0 +1,16 @@
+// =============================================================================
+// sjtag.flist - SJTAG VIP 文件列表
+//
+// 说明：
+//   供 VCS 编译时通过 -f 参数加载。
+//   接口文件（sjtag_if.sv）须在 package 之前单独编译。
+//   其余文件通过 sjtag_pkg.sv 的 `include 链式引入，无需单独列出。
+// =============================================================================
+
++incdir+${REPO_ROOT}/vip/sjtag
+
+// 接口（需在 package 外独立声明）
+${REPO_ROOT}/vip/sjtag/sjtag_if.sv
+
+// VIP 顶层包（内部 `include 全部 VIP 类）
+${REPO_ROOT}/vip/sjtag/sjtag_pkg.sv

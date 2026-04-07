@@ -71,16 +71,21 @@ if [ ! -f "${SIMV}" ]; then
 fi
 
 #-----------------------------------------------------------------------------
-# 处理随机种子
+# 处理随机种子：计算 SEED_DIR 用于路径拼接，SEED 保持原值传给 simv
 #-----------------------------------------------------------------------------
-if [ "${SEED}" = "random" ]; then
-    SEED=$((RANDOM * RANDOM))
+SEED="${SEED%% *}"   # trim 尾部空格（防止 Makefile 行内注释带入空格）
+if [[ "${SEED}" == "random" ]]; then
+    # od 读 4 字节转无符号十进制，不产生 SIGPIPE
+    SEED_DIR=$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n')
+    SEED_DIR="${SEED_DIR:-1}"
+else
+    SEED_DIR="${SEED}"
 fi
 
 #-----------------------------------------------------------------------------
 # 仿真输出目录（按 测试名_种子 隔离，每次运行结果独立存放）
 #-----------------------------------------------------------------------------
-SIM_DIR="${OUTPUT_ROOT}/${PROJ}/sim/${TC}_${SEED}"
+SIM_DIR="${OUTPUT_ROOT}/${PROJ}/sim/${TC}_${SEED_DIR}"
 SIM_LOG="${SIM_DIR}/${TC}.log"
 FSDB_FILE="${SIM_DIR}/${TC}.fsdb"
 RESULT_JSON="${SIM_DIR}/result.json"
@@ -98,7 +103,7 @@ START_TS=$(date +%s)
 echo -e "${GREEN}[INFO] ===== 开始仿真 =====${NC}"
 echo -e "[INFO] 项目:     ${PROJ}"
 echo -e "[INFO] 测试:     ${TC}"
-echo -e "[INFO] 种子:     ${SEED}"
+echo -e "[INFO] 种子:     ${SEED_DIR}"
 echo -e "[INFO] 超时:     ${CASE_TIMEOUT}s"
 [ -n "${CASE_ID}"     ] && echo -e "[INFO] Case ID:  ${CASE_ID}"
 [ -n "${CASE_SEQ}"    ] && echo -e "[INFO] Seq:      ${CASE_SEQ}"
@@ -181,7 +186,7 @@ if [ "${SIM_EXIT}" -eq 124 ]; then
 fi
 
 #-----------------------------------------------------------------------------
-# 仿真结果判定（扫描 UVM 报告行）
+# 仿真结果判定（只扫描 UVM Report catcher Summary 之前的日志内容）
 #-----------------------------------------------------------------------------
 echo ""
 echo "============================================================"
@@ -190,8 +195,11 @@ UVM_FATAL=0
 UVM_ERROR=0
 
 if [ -f "${SIM_LOG}" ]; then
-    UVM_FATAL=$(grep -c "UVM_FATAL" "${SIM_LOG}" 2>/dev/null || true)
-    UVM_ERROR=$(grep -c "UVM_ERROR" "${SIM_LOG}" 2>/dev/null || true)
+    # 截取 "UVM Report catcher Summary" 之前的内容，避免将汇总行中的
+    # "UVM_FATAL : 0" / "UVM_ERROR : 0" 误判为真实错误
+    LOG_BODY=$(sed '/UVM Report catcher Summary/Q' "${SIM_LOG}" 2>/dev/null)
+    UVM_FATAL=$(echo "${LOG_BODY}" | grep -c "UVM_FATAL" 2>/dev/null || true)
+    UVM_ERROR=$(echo "${LOG_BODY}" | grep -c "UVM_ERROR" 2>/dev/null || true)
 else
     echo -e "${RED}[FAIL] 仿真日志不存在，仿真可能异常退出${NC}"
 fi
@@ -207,7 +215,7 @@ else
     echo -e "${RED}[INFO] UVM_FATAL: ${UVM_FATAL}  UVM_ERROR: ${UVM_ERROR}${NC}"
 fi
 
-echo -e "[INFO] 测试: ${TC}  种子: ${SEED}  耗时: ${DURATION}s"
+echo -e "[INFO] 测试: ${TC}  种子: ${SEED_DIR}  耗时: ${DURATION}s"
 [ -n "${CASE_ID}" ] && echo -e "[INFO] Case ID: ${CASE_ID}"
 echo -e "[INFO] 仿真日志: ${SIM_LOG}"
 if [ "${WAVE}" = "1" ] && [ -f "${FSDB_FILE}" ]; then
@@ -223,7 +231,7 @@ import json, datetime
 result = {
     "case_id":   "${CASE_ID}",
     "case_name": "${TC}",
-    "seed":      ${SEED},
+    "seed":      ${SEED_DIR},
     "passed":    ${PASSED} == 1,
     "uvm_fatal": ${UVM_FATAL},
     "uvm_error": ${UVM_ERROR},

@@ -50,7 +50,7 @@ if [ ! -d "${PROJ_DIR}" ]; then
     echo -e "${YELLOW}[INFO]  当前可用的项目:${NC}"
     # 列出 verif/ 下所有包含 dut.flist 的子目录
     if [ -d "${VERIF_DIR}" ]; then
-        find "${VERIF_DIR}" -name "dut.flist" -type f 2>/dev/null | while read -r f; do
+        find "${VERIF_DIR}" -name "*.flist" -type f 2>/dev/null | while read -r f; do
             dirname "$f" | sed "s|${VERIF_DIR}/||"
         done
     else
@@ -60,12 +60,13 @@ if [ ! -d "${PROJ_DIR}" ]; then
 fi
 
 if [ ! -f "${DUT_FLIST}" ]; then
-    echo -e "${RED}[ERROR] dut.flist 不存在: ${DUT_FLIST}${NC}"
+    echo -e "${RED}[ERROR] 文件列表不存在: ${DUT_FLIST}${NC}"
     echo -e "${YELLOW}[INFO]  请在项目目录下创建 dut.flist 文件，格式示例:${NC}"
     echo ""
-    echo "  // DUT RTL 文件列表"
-    echo "  +incdir+\${REPO_ROOT}/design/example/rtl"
-    echo "  \${REPO_ROOT}/design/example/rtl/example.sv"
+    echo "  // 引用 RTL 文件列表"
+    echo "  -f \${REPO_ROOT}/design/${PROJ}/${PROJ}.flist"
+    echo "  // 追加 Testbench 文件"
+    echo "  \${REPO_ROOT}/verif/${PROJ}/tb_top.sv"
     echo ""
     exit 1
 fi

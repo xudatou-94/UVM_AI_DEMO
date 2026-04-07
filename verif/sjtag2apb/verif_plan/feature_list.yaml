@@ -1,0 +1,284 @@
+# =============================================================================
+# feature_list.yaml - sjtag2apb 验证功能点列表
+#
+# 字段说明：
+#   case_id      : 唯一标识，与 case_list.json 中 case_id 字段对应
+#   case_name    : 用例名称，与 case_list.json 中 case_name 字段对应
+#   priority     : 优先级，P1=必须覆盖 / P2=应覆盖 / P3=尽力覆盖
+#   description  : 功能点简述
+#   verif_steps  : 验证步骤（有序列表）
+#   random_means : 随机化手段
+#   check_method :
+#     correctness : 正确性检查手段（单次事务结果是否正确）
+#     completeness: 完备性检查手段（是否覆盖足够多的场景）
+# =============================================================================
+
+meta:
+  dut         : sjtag2apb
+  version     : 1.0
+  description : SJTAG-to-APB bridge 验证计划
+
+features:
+
+  # ---------------------------------------------------------------------------
+  # F001 TAP 复位
+  # ---------------------------------------------------------------------------
+  - feature_id   : F001
+    feature_name : TAP 复位
+    description  : 验证 TAP 控制器的硬件复位（TRST_N）和软件复位（5×TMS=1）行为
+
+    cases:
+      - case_id   : sjtag2apb_0001
+        case_name : sjtag2apb_tap_hard_reset
+        priority  : P1
+        description: 验证 TRST_N 异步硬复位后 TAP 状态机回到 TEST_LOGIC_RESET，后续事务正常
+        verif_steps:
+          - 通过 SJTAG VIP 将 TAP 驱动到非 IDLE 的任意中间状态
+          - 在任意 TCK 相位拉低 TRST_N，保持 2 个 TCK 周期
+          - 释放 TRST_N，发送 IDCODE 读取序列
+          - 比对 IDCODE 读回值与 IDCODE_VAL 参数
+        random_means: 随机化复位前所处的 TAP 状态（覆盖 SHIFT_DR / SHIFT_IR / PAUSE_DR / UPDATE_DR 等）
+        check_method:
+          correctness : scoreboard 验证 IDCODE 读回值 == 32'h5A7B_0001
+          completeness: 功能覆盖组 cg_reset_from_state 覆盖从全部 16 个 TAP 状态触发 TRST_N 的场景
+
+      - case_id   : sjtag2apb_0002
+        case_name : sjtag2apb_tap_soft_reset
+        priority  : P1
+        description: 验证连续 ≥5 个 TMS=1 软复位后 TAP 回到 TEST_LOGIC_RESET
+        verif_steps:
+          - 将 TAP 驱动至随机中间状态
+          - 发送随机数量（5~10 个）连续 TMS=1 的 TCK 脉冲
+          - 发送 IDCODE 读取序列，比对读回值
+        random_means: 随机化软复位前的 TAP 状态；随机化 TMS=1 连续个数（5~10）
+        check_method:
+          correctness : IDCODE 读回值 == 32'h5A7B_0001
+          completeness: 覆盖从 SELECT_DR / SHIFT_DR / PAUSE_DR / UPDATE_DR / SELECT_IR 等主要状态发起软复位
+
+  # ---------------------------------------------------------------------------
+  # F002 IDCODE 读取
+  # ---------------------------------------------------------------------------
+  - feature_id   : F002
+    feature_name : IDCODE 读取
+    description  : 验证 INSTR_IDCODE 指令和设备标识码的正确性
+
+    cases:
+      - case_id   : sjtag2apb_0003
+        case_name : sjtag2apb_idcode_read
+        priority  : P1
+        description: 通过 INSTR_IDCODE 指令读取 IDCODE，验证数值与设计参数一致
+        verif_steps:
+          - TAP 复位至 RUN_TEST_IDLE
+          - 移入 IR = 4'h1（INSTR_IDCODE）
+          - 执行 DR 扫描，读取 32bit IDCODE
+          - 比对读回值与 IDCODE_VAL（32'h5A7B_0001）
+        random_means: 随机化 IR/DR 扫描前在 RUN_TEST_IDLE 停留的周期数（1~10）
+        check_method:
+          correctness : scoreboard 断言 IDCODE 读回值恒等于 32'h5A7B_0001
+          completeness: 重复读取 ≥10 次，确认每次结果一致；覆盖复位后首次读和连续多次读
+
+  # ---------------------------------------------------------------------------
+  # F003 BYPASS 指令
+  # ---------------------------------------------------------------------------
+  - feature_id   : F003
+    feature_name : BYPASS 指令
+    description  : 验证 INSTR_BYPASS 模式下 TDI 经 1bit 旁路寄存器延迟一拍后出现在 TDO
+
+    cases:
+      - case_id   : sjtag2apb_0004
+        case_name : sjtag2apb_bypass
+        priority  : P2
+        description: BYPASS 模式下 TDO 输出应比 TDI 输入滞后恰好 1 个 TCK
+        verif_steps:
+          - 移入 IR = 4'hF（INSTR_BYPASS）
+          - SHIFT_DR 阶段移入随机 bit 序列（N bits）
+          - monitor 同步记录 TDI 和 TDO 序列
+          - 比对 TDO[i] == TDI[i-1]（滞后 1 拍）
+        random_means: 随机化移入 bit 序列内容（全0/全1/随机）和长度（8~64bit）
+        check_method:
+          correctness : monitor 逐 bit 比对 TDO 与 TDI 延迟 1 拍后的期望序列，任何不匹配报 UVM_ERROR
+          completeness: 覆盖全 0、全 1、随机 pattern；覆盖不同长度（8/32/64bit）
+
+  # ---------------------------------------------------------------------------
+  # F004 APB 写操作
+  # ---------------------------------------------------------------------------
+  - feature_id   : F004
+    feature_name : APB 写操作
+    description  : 验证通过 SJTAG 发起的 APB 写事务地址、数据正确送达 APB 总线
+
+    cases:
+      - case_id   : sjtag2apb_0005
+        case_name : sjtag2apb_apb_write_basic
+        priority  : P1
+        description: 基本 APB 写操作，验证 PADDR / PWDATA / PWRITE 与 seq_item 一致
+        verif_steps:
+          - 配置 APB VIP 为 slave 模式（默认 wait_states=0）
+          - 通过 SJTAG VIP 发送随机地址/数据的 APB_WRITE 事务
+          - APB monitor 采集总线上实际出现的 PADDR / PWDATA / PWRITE
+          - scoreboard 比对采集值与 SJTAG seq_item 字段
+        random_means: 随机化 PADDR（4字节对齐，覆盖低/中/高地址段）、PWDATA（全0/全1/随机）
+        check_method:
+          correctness : scoreboard 断言 PADDR == item.addr，PWDATA == item.wdata，PWRITE == 1
+          completeness: 覆盖地址边界（32'h0000_0000 / 32'hFFFF_FFFC）；覆盖全0/全1/随机数据
+
+      - case_id   : sjtag2apb_0006
+        case_name : sjtag2apb_apb_write_burst
+        priority  : P2
+        description: 连续 N 次 APB 写，验证事务间互不干扰，无地址/数据混淆
+        verif_steps:
+          - 连续发送 N 次（N 随机 2~16）APB_WRITE 事务，地址和数据各自随机
+          - APB monitor 按顺序记录每笔事务
+          - 依次比对每笔事务的地址和数据
+        random_means: 随机化事务数量（2~16）、地址序列（可重复/不重复）、数据值
+        check_method:
+          correctness : 每笔事务的 PADDR/PWDATA 与对应 seq_item 一致，无乱序
+          completeness: 覆盖相同地址重复写（验证覆盖/覆盖行为）和递增地址连续写
+
+  # ---------------------------------------------------------------------------
+  # F005 APB 读操作
+  # ---------------------------------------------------------------------------
+  - feature_id   : F005
+    feature_name : APB 读操作
+    description  : 验证通过 SJTAG 发起的 APB 读事务数据经 CDC 同步后正确从 TDO 移出
+
+    cases:
+      - case_id   : sjtag2apb_0007
+        case_name : sjtag2apb_apb_read_basic
+        priority  : P1
+        description: 基本 APB 读操作（两次 DR 扫描），PRDATA 正确出现在 TDO
+        verif_steps:
+          - APB slave 预置指定地址的读回数据
+          - 第一次 DR 扫描：移入读地址（RW=0），触发 DUT 发起 APB 读事务
+          - 等待若干 TCK（确保 APB 事务完成，PRDATA 经 CDC 同步至 TCK 域）
+          - 第二次 DR 扫描：CAPTURE_DR 时 DUT 将 PRDATA 载入 DR，移出 TDO
+          - 比对 TDO 读回值与 APB slave 预置数据
+        random_means: 随机化读取地址、slave 预置数据值；随机化两次 DR 扫描之间的等待周期数
+        check_method:
+          correctness : scoreboard 断言 TDO 移出的 PRDATA == APB slave 预置值
+          completeness: 覆盖全0/全1/随机数据；覆盖地址边界；覆盖最小等待周期（CDC 刚好完成）
+
+      - case_id   : sjtag2apb_0008
+        case_name : sjtag2apb_apb_read_after_write
+        priority  : P1
+        description: 先写后读（write-then-read），验证读写数据一致性
+        verif_steps:
+          - 写入随机数据到随机地址
+          - 等待随机 TCK 周期后读回同一地址
+          - 比对读回数据与写入数据
+        random_means: 随机化地址和数据；随机化写后等待的 TCK 周期数（5~50）
+        check_method:
+          correctness : 读回值 == 写入值，不一致时报 UVM_ERROR 并打印地址/期望/实际
+          completeness: 多组（≥20 组）地址/数据对；覆盖地址空间低段/中段/高段
+
+  # ---------------------------------------------------------------------------
+  # F006 APB 等待状态（PREADY 延迟）
+  # ---------------------------------------------------------------------------
+  - feature_id   : F006
+    feature_name : APB 等待状态
+    description  : 验证 APB slave 插入 wait state 时 DUT 正确等待 PREADY 并完成事务
+
+    cases:
+      - case_id   : sjtag2apb_0009
+        case_name : sjtag2apb_apb_wait_state
+        priority  : P2
+        description: APB slave 随机延迟 PREADY（0~7 周期），DUT 应正常完成所有事务
+        verif_steps:
+          - 配置 APB slave VIP 的 wait_states 为随机值（0~7）
+          - 分别对读事务和写事务验证 wait state 场景
+          - APB monitor 确认 PENABLE 在 PREADY=0 期间保持高
+          - 验证事务完成后数据正确
+        random_means: 随机化 wait_states（0/1/2/4/7）；随机化读写方向；随机化地址和数据
+        check_method:
+          correctness : 事务完成后数据正确；APB monitor 断言 PENABLE 未提前撤销
+          completeness: 覆盖 wait_states = 0/1/最大值（7）；覆盖读和写两个方向
+
+  # ---------------------------------------------------------------------------
+  # F007 APB 错误响应（PSLVERR）
+  # ---------------------------------------------------------------------------
+  - feature_id   : F007
+    feature_name : APB 错误响应
+    description  : 验证 APB slave 返回 PSLVERR=1 时 DUT 不死锁，后续事务可正常执行
+
+    cases:
+      - case_id   : sjtag2apb_0010
+        case_name : sjtag2apb_apb_slverr
+        priority  : P2
+        description: slave 返回 PSLVERR 后 DUT 能继续正常处理后续事务
+        verif_steps:
+          - 配置 APB slave 对特定地址返回 PSLVERR=1
+          - 发送触发 PSLVERR 的读或写事务
+          - 连续发送若干（≥5 笔）正常事务
+          - 验证正常事务的数据正确，DUT 未挂起
+        random_means: 随机化触发 PSLVERR 的地址；随机化读/写方向触发；随机化 PSLVERR 在事务序列中的位置
+        check_method:
+          correctness : PSLVERR 事务后续的正常读写数据正确；仿真无超时
+          completeness: 覆盖读事务触发 PSLVERR 和写事务触发 PSLVERR；覆盖连续两次 PSLVERR
+
+  # ---------------------------------------------------------------------------
+  # F008 CDC 跨时钟域同步
+  # ---------------------------------------------------------------------------
+  - feature_id   : F008
+    feature_name : CDC 跨时钟域同步
+    description  : 验证 TCK 与 PCLK 不同频率比下数据同步的正确性，以及 toggle 同步器不丢脉冲
+
+    cases:
+      - case_id   : sjtag2apb_0011
+        case_name : sjtag2apb_cdc_freq_ratio
+        priority  : P2
+        description: 不同 TCK/PCLK 频率比（1:5 / 1:10 / 1:20）下 APB 读写事务均正确
+        verif_steps:
+          - 分别配置 TCK=5MHz/10MHz/20MHz，PCLK=100MHz（通过 tb_top 时钟参数化）
+          - 在每种频率组合下执行 APB 读写各 ≥10 笔
+          - 验证所有事务数据正确
+        random_means: 随机化地址和数据；随机化读写顺序
+        check_method:
+          correctness : 所有频率组合下读写数据均正确
+          completeness: 覆盖频率比 1:5 / 1:10 / 1:20；每种组合下读写各 ≥10 笔
+
+      - case_id   : sjtag2apb_0012
+        case_name : sjtag2apb_cdc_back2back
+        priority  : P3
+        description: 背靠背 APB 事务（最小事务间隔），验证 toggle 同步器不丢脉冲
+        verif_steps:
+          - 配置 SJTAG VIP 以最小间隔（RTI 仅停留 1 周期）连续发送 N 笔事务
+          - APB monitor 统计实际完成的事务笔数
+          - 与 SJTAG VIP 发出的笔数对比
+        random_means: 随机化连续事务数量（2~8）；随机化事务间 RTI 停留周期（1~5）
+        check_method:
+          correctness : APB 完成的事务数 == SJTAG 发出的事务数，无丢失
+          completeness: 覆盖最短间隔（RTI 1周期）和稍长间隔（RTI 3/5 周期）
+
+  # ---------------------------------------------------------------------------
+  # F009 随机回归
+  # ---------------------------------------------------------------------------
+  - feature_id   : F009
+    feature_name : 随机回归
+    description  : 全随机混合激励，覆盖上述功能点的交叉组合，以覆盖率驱动收敛
+
+    cases:
+      - case_id   : sjtag2apb_0013
+        case_name : sjtag2apb_random_regression
+        priority  : P1
+        description: 全随机激励，随机操作类型、地址、数据、延迟、错误注入，覆盖多功能点交叉
+        verif_steps:
+          - 随机产生 N 笔（N=50~200）混合事务序列（read/write/idcode/reset 随机选择）
+          - APB slave 随机配置 wait_states（0~7）和 PSLVERR 注入（概率 5%）
+          - 执行完整序列，scoreboard 对每笔事务做数据比对
+          - 仿真结束后检查功能覆盖率是否达标
+        random_means: >
+          随机化：操作类型（read/write/idcode/reset）权重可配；
+          PADDR（全地址空间均匀分布）；PWDATA（全值域）；
+          事务间 RTI 停留周期（1~20）；wait_states（0~7）；
+          PSLVERR 注入概率（约 5%）；TCK 半周期微抖动（±5%）
+        check_method:
+          correctness: >
+            scoreboard 维护 shadow register model，对每笔写后的读操作
+            比对实际 PRDATA 与 shadow 值；任何不匹配报 UVM_ERROR
+          completeness: >
+            仿真结束时检查以下功能覆盖组：
+            - cg_tap_state：全部 16 个 TAP 状态均被访问
+            - cg_instr：IDCODE / APB_ACCESS / BYPASS 均被执行
+            - cg_apb_rw：读/写各 ≥50 次
+            - cg_wait_states：0~7 各至少覆盖 1 次
+            - cg_pslverr：读触发 / 写触发各 ≥1 次
+            - cg_reset：TRST_N 复位和软复位各 ≥3 次

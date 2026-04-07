@@ -1,0 +1,18 @@
+// =============================================================================
+// dut.flist - SJTAG 转 APB 桥 RTL 文件列表
+//
+// 用途：供 VCS 编译时通过 -f 参数加载
+// 路径：使用 ${REPO_ROOT} 表示仓库根目录，由 find_flist.sh 自动展开
+// =============================================================================
+
+// 头文件搜索路径
++incdir+${REPO_ROOT}/design/sjtag2apb/rtl
+
+// Package（需最先编译）
+${REPO_ROOT}/design/sjtag2apb/rtl/sjtag2apb_pkg.sv
+
+// TAP 状态机
+${REPO_ROOT}/design/sjtag2apb/rtl/sjtag_tap_ctrl.sv
+
+// 顶层桥模块
+${REPO_ROOT}/design/sjtag2apb/rtl/sjtag2apb_bridge.sv

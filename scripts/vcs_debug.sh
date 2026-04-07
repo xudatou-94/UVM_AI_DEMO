@@ -35,18 +35,25 @@ if [ ! -d "${SIM_BASE}" ]; then
     exit 1
 fi
 
-FSDB_FILE=""
-
-if [ "${SEED}" != "random" ]; then
-    # 精确匹配指定种子的波形文件
-    FSDB_FILE="${SIM_BASE}/${TC}_${SEED}/${TC}.fsdb"
+# 与 vcs_run.sh 保持一致：SEED 可能为 "random"，用 SEED_DIR 拼路径
+SEED="${SEED%% *}"
+if [[ "${SEED}" != "random" ]]; then
+    SEED_DIR="${SEED}"
+else
+    SEED_DIR=""
 fi
 
-# 如果未找到，搜索最新的匹配波形
+FSDB_FILE=""
+
+# 优先精确匹配（指定了数字种子时）
+if [ -n "${SEED_DIR}" ]; then
+    FSDB_FILE="${SIM_BASE}/${TC}_${SEED_DIR}/${TC}.fsdb"
+fi
+
+# 未找到时，搜索最新的匹配波形（避免 xargs 空输入问题）
 if [ -z "${FSDB_FILE}" ] || [ ! -f "${FSDB_FILE}" ]; then
     FSDB_FILE=$(find "${SIM_BASE}" -name "${TC}.fsdb" -type f 2>/dev/null \
-                | xargs ls -t 2>/dev/null \
-                | head -1)
+                | sort | tail -1)
 fi
 
 if [ -z "${FSDB_FILE}" ] || [ ! -f "${FSDB_FILE}" ]; then

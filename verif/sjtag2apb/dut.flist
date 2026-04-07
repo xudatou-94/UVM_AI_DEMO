@@ -1,0 +1,29 @@
+// =============================================================================
+// dut.flist - sjtag2apb 验证环境完整文件列表
+//
+// 编译顺序：
+//   1. RTL（design 侧 sjtag2apb.flist）
+//   2. SJTAG VIP（接口 + package）
+//   3. APB VIP（接口 + package）
+//   4. TB package（sjtag2apb_tb_pkg）
+//   5. tb_top（顶层模块，不在 package 内）
+// =============================================================================
+
+// ---- RTL 文件列表（由设计侧维护）----
+-f ${REPO_ROOT}/design/sjtag2apb/sjtag2apb.flist
+
+// ---- VIP：SJTAG（接口 + package）----
+-f ${REPO_ROOT}/vip/sjtag/sjtag.flist
+
+// ---- VIP：APB（接口 + package）----
+-f ${REPO_ROOT}/vip/apb/apb.flist
+
+// ---- TB package 搜索路径 ----
++incdir+${REPO_ROOT}/verif/sjtag2apb/tb
++incdir+${REPO_ROOT}/verif/sjtag2apb/tb/seq
+
+// ---- TB 顶层包 ----
+${REPO_ROOT}/verif/sjtag2apb/tb/sjtag2apb_tb_pkg.sv
+
+// ---- TB 顶层模块（不在 package 内，须最后编译）----
+${REPO_ROOT}/verif/sjtag2apb/tb/tb_top.sv
