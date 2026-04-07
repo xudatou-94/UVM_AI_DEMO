@@ -381,3 +381,61 @@ if [ -z "${FSDB_FILE}" ] || [ ! -f "${FSDB_FILE}" ]; then
                 | sort | tail -1)
 fi
 ```
+
+---
+
+## 问题十五：UVM 汇总行导致仿真结果误判为失败
+
+**文件**：`scripts/vcs_run.sh`
+
+**现象**：  
+仿真实际通过，但脚本判断结果为 FAIL。
+
+**根因**：  
+VCS 在仿真结束时会打印 UVM Report Summary，内容包含：
+```
+UVM_FATAL :    0
+UVM_ERROR :    0
+```
+原来的 `grep -c "UVM_FATAL"` 和 `grep -c "UVM_ERROR"` 会匹配到这两行，即使没有真实错误，计数也为非零，导致误判为失败。
+
+**修复**：  
+用 `sed '/UVM Report catcher Summary/Q'` 截取分隔符之前的日志内容，只在该范围内做 grep，避免汇总行干扰：
+
+```bash
+# 修复前
+UVM_FATAL=$(grep -c "UVM_FATAL" "${SIM_LOG}" 2>/dev/null || true)
+UVM_ERROR=$(grep -c "UVM_ERROR" "${SIM_LOG}" 2>/dev/null || true)
+
+# 修复后
+LOG_BODY=$(sed '/UVM Report catcher Summary/Q' "${SIM_LOG}" 2>/dev/null)
+UVM_FATAL=$(echo "${LOG_BODY}" | grep -c "UVM_FATAL" 2>/dev/null || true)
+UVM_ERROR=$(echo "${LOG_BODY}" | grep -c "UVM_ERROR" 2>/dev/null || true)
+```
+
+---
+
+## 问题十六：激励批量写后再批量读，slave 数据丢失
+
+**文件**：`verif/sjtag2apb/tb/seq/sjtag2apb_apb_write_basic_seq.sv`、`sjtag2apb_apb_write_burst_seq.sv`
+
+**现象**：  
+scoreboard 读回数据与写入值不匹配。
+
+**根因**：  
+APB slave model 每笔事务响应后不保存写入数据，内存模型只在当次响应期间有效（仅保留一拍）。批量写入 N 笔后再批量读回，每个地址的写入数据早已丢失。
+
+**修复**：  
+将所有写操作改为写一笔立即回读一笔的模式：
+
+```systemverilog
+// 修复前（错误）
+for i in 0..N: write(addr[i], data[i])
+for i in 0..N: read(addr[i], rdata)
+
+// 修复后（正确）
+for i in 0..N: begin
+  write(addr, data)
+  read(addr, rdata)   // 立即回读
+end
+```
