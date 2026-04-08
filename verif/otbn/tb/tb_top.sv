@@ -24,10 +24,8 @@ module tb_top;
   // ----------------------------------------------------------
   // Parameters
   // ----------------------------------------------------------
-  localparam int CLK_PERIOD_NS  = 10;  // 100 MHz
-  localparam int CLK_EDN_NS     = 10;
-  localparam int CLK_OTP_NS     = 10;
-  localparam int NumAlerts      = otbn_reg_pkg::NumAlerts;
+  localparam int CLK_PERIOD_NS = 10;  // 100 MHz
+  localparam int NumAlerts     = otbn_reg_pkg::NumAlerts;
 
   // ----------------------------------------------------------
   // Clocks and resets
@@ -43,61 +41,38 @@ module tb_top;
   always #(CLK_PERIOD_NS/2) clk_i = ~clk_i;
 
   initial clk_edn_i = 1'b0;
-  always #(CLK_EDN_NS/2) clk_edn_i = ~clk_edn_i;
+  always #(CLK_PERIOD_NS/2) clk_edn_i = ~clk_edn_i;
 
   initial clk_otp_i = 1'b0;
-  always #(CLK_OTP_NS/2) clk_otp_i = ~clk_otp_i;
+  always #(CLK_PERIOD_NS/2) clk_otp_i = ~clk_otp_i;
 
   // ----------------------------------------------------------
-  // TL-UL interface signals
+  // TL-UL interface (between TB driver and intg_gen)
   // ----------------------------------------------------------
-  tl_h2d_t tl_i;
-  tl_d2h_t tl_o;
+  otbn_tl_if tl_if (.clk(clk_i), .rst_n(rst_ni));
 
   // ----------------------------------------------------------
-  // Alert interface
+  // Integrity generator: sits between VIF and DUT
+  // Computes cmd_intg and data_intg automatically
+  // ----------------------------------------------------------
+  tl_h2d_t tl_h2d_intg;  // DUT input (with integrity)
+  tl_d2h_t tl_d2h_dut;   // DUT output
+
+  // Feed driver output (no integrity) through the gen module
+  tlul_cmd_intg_gen u_cmd_intg_gen (
+    .tl_i (tl_if.h2d),
+    .tl_o (tl_h2d_intg)
+  );
+
+  // Connect DUT response back to interface
+  assign tl_if.d2h = tl_d2h_dut;
+
+  // ----------------------------------------------------------
+  // Alert interface (tie-off)
   // ----------------------------------------------------------
   alert_rx_t [NumAlerts-1:0] alert_rx_i;
   alert_tx_t [NumAlerts-1:0] alert_tx_o;
 
-  // ----------------------------------------------------------
-  // EDN interface
-  // ----------------------------------------------------------
-  edn_req_t edn_rnd_o;
-  edn_rsp_t edn_rnd_i;
-  edn_req_t edn_urnd_o;
-  edn_rsp_t edn_urnd_i;
-
-  // ----------------------------------------------------------
-  // OTP key interface
-  // ----------------------------------------------------------
-  otbn_otp_key_req_t otbn_otp_key_o;
-  otbn_otp_key_rsp_t otbn_otp_key_i;
-
-  // ----------------------------------------------------------
-  // Keymgr sideload key
-  // ----------------------------------------------------------
-  otbn_key_req_t keymgr_key_i;
-
-  // ----------------------------------------------------------
-  // RAM config (tie-off)
-  // ----------------------------------------------------------
-  ram_1p_cfg_t     ram_cfg_imem_i;
-  ram_1p_cfg_t     ram_cfg_dmem_i;
-  ram_1p_cfg_rsp_t ram_cfg_rsp_imem_o;
-  ram_1p_cfg_rsp_t ram_cfg_rsp_dmem_o;
-
-  // ----------------------------------------------------------
-  // Other outputs
-  // ----------------------------------------------------------
-  mubi4_t idle_o;
-  logic   intr_done_o;
-  lc_tx_t lc_rma_ack_o;
-
-  // ----------------------------------------------------------
-  // Tie-offs for unused inputs
-  // ----------------------------------------------------------
-  // Alert: drive p/n to inactive
   always_comb begin
     for (int i = 0; i < NumAlerts; i++) begin
       alert_rx_i[i].ack_p  = 1'b0;
@@ -107,42 +82,71 @@ module tb_top;
     end
   end
 
-  // LC: off by default
+  // ----------------------------------------------------------
+  // LC interface (tie-off: off/default)
+  // ----------------------------------------------------------
   lc_tx_t lc_escalate_en_i;
   lc_tx_t lc_rma_req_i;
+  lc_tx_t lc_rma_ack_o;
   assign lc_escalate_en_i = LC_TX_DEFAULT;
   assign lc_rma_req_i     = LC_TX_DEFAULT;
 
-  // RAM config: all zeros (tie-off)
+  // ----------------------------------------------------------
+  // RAM config (tie-off)
+  // ----------------------------------------------------------
+  ram_1p_cfg_t     ram_cfg_imem_i;
+  ram_1p_cfg_t     ram_cfg_dmem_i;
+  ram_1p_cfg_rsp_t ram_cfg_rsp_imem_o;
+  ram_1p_cfg_rsp_t ram_cfg_rsp_dmem_o;
   assign ram_cfg_imem_i = '0;
   assign ram_cfg_dmem_i = '0;
 
-  // EDN: always ready, return fixed entropy
+  // ----------------------------------------------------------
+  // EDN (always-ready, fixed entropy)
+  // ----------------------------------------------------------
+  edn_req_t edn_rnd_o;
+  edn_rsp_t edn_rnd_i;
+  edn_req_t edn_urnd_o;
+  edn_rsp_t edn_urnd_i;
+
   assign edn_rnd_i.edn_ack  = edn_rnd_o.edn_req;
   assign edn_rnd_i.edn_fips = 1'b1;
   assign edn_rnd_i.edn_bus  = 32'hDEAD_BEEF;
-
   assign edn_urnd_i.edn_ack  = edn_urnd_o.edn_req;
   assign edn_urnd_i.edn_fips = 1'b1;
   assign edn_urnd_i.edn_bus  = 32'hCAFE_BABE;
 
-  // OTP key: provide valid default key
+  // ----------------------------------------------------------
+  // OTP key (respond with fixed key on req)
+  // ----------------------------------------------------------
+  otbn_otp_key_req_t otbn_otp_key_o;
+  otbn_otp_key_rsp_t otbn_otp_key_i;
+
   always_ff @(posedge clk_otp_i or negedge rst_otp_ni) begin
     if (!rst_otp_ni) begin
       otbn_otp_key_i <= '0;
     end else if (otbn_otp_key_o.req) begin
-      otbn_otp_key_i.ack   <= 1'b1;
-      otbn_otp_key_i.key   <= 128'hDEAD_BEEF_CAFE_BABE_1234_5678_9ABC_DEF0;
-      otbn_otp_key_i.nonce <= 64'hFEED_FACE_CAFE_BEEF;
+      otbn_otp_key_i.ack        <= 1'b1;
+      otbn_otp_key_i.key        <= 128'hDEAD_BEEF_CAFE_BABE_1234_5678_9ABC_DEF0;
+      otbn_otp_key_i.nonce      <= 64'hFEED_FACE_CAFE_BEEF;
       otbn_otp_key_i.seed_valid <= 1'b1;
     end else begin
       otbn_otp_key_i.ack <= 1'b0;
     end
   end
 
-  // Keymgr sideload key: not valid by default
-  assign keymgr_key_i.valid  = 1'b0;
-  assign keymgr_key_i.key    = '0;
+  // ----------------------------------------------------------
+  // Keymgr sideload key (inactive)
+  // ----------------------------------------------------------
+  otbn_key_req_t keymgr_key_i;
+  assign keymgr_key_i.valid = 1'b0;
+  assign keymgr_key_i.key   = '0;
+
+  // ----------------------------------------------------------
+  // Other outputs
+  // ----------------------------------------------------------
+  mubi4_t idle_o;
+  logic   intr_done_o;
 
   // ----------------------------------------------------------
   // DUT
@@ -153,8 +157,8 @@ module tb_top;
     .clk_i,
     .rst_ni,
 
-    .tl_i,
-    .tl_o,
+    .tl_i           (tl_h2d_intg),
+    .tl_o           (tl_d2h_dut),
 
     .idle_o,
     .intr_done_o,
@@ -187,25 +191,24 @@ module tb_top;
   );
 
   // ----------------------------------------------------------
-  // Reset sequence
+  // Reset sequence (separate initial block, before run_test)
   // ----------------------------------------------------------
   initial begin
     rst_ni     = 1'b0;
     rst_edn_ni = 1'b0;
     rst_otp_ni = 1'b0;
-    tl_i       = '0;
     repeat (10) @(posedge clk_i);
+    @(negedge clk_i);
     rst_ni     = 1'b1;
     rst_edn_ni = 1'b1;
     rst_otp_ni = 1'b1;
   end
 
   // ----------------------------------------------------------
-  // UVM launch
+  // UVM launch (must run at time 0)
   // ----------------------------------------------------------
   initial begin
-    // Pass interface handles to UVM config DB
-    uvm_config_db #(virtual interface_placeholder)::set(null, "*", "vif", null);
+    uvm_config_db #(virtual otbn_tl_if)::set(null, "uvm_test_top.*", "vif", tl_if);
     run_test();
   end
 

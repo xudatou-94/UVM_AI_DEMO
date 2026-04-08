@@ -1,0 +1,21 @@
+// ============================================================
+// OTBN Testbench flist
+// ============================================================
+
++incdir+${REPO_ROOT}/verif/otbn/tb
++incdir+${REPO_ROOT}/verif/otbn/agent
++incdir+${REPO_ROOT}/verif/otbn/env
++incdir+${REPO_ROOT}/verif/otbn/seq
++incdir+${REPO_ROOT}/verif/otbn/test
+
+// Interface
+${REPO_ROOT}/verif/otbn/tb/otbn_tl_if.sv
+
+// Packages (order: agent -> env -> test)
+${REPO_ROOT}/verif/otbn/agent/otbn_tl_pkg.sv
+${REPO_ROOT}/verif/otbn/env/otbn_env_pkg.sv
+${REPO_ROOT}/verif/otbn/test/otbn_test_pkg.sv
+${REPO_ROOT}/verif/otbn/tb/otbn_tb_pkg.sv
+
+// TB top
+${REPO_ROOT}/verif/otbn/tb/tb_top.sv

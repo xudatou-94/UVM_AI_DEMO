@@ -11,6 +11,9 @@
 +incdir+${REPO_ROOT}/design/otbn/ip_pkg
 +incdir+${REPO_ROOT}/design/otbn/rtl
 
+// top_pkg (required by tlul_pkg)
+${REPO_ROOT}/design/otbn/ip_pkg/top_pkg.sv
+
 // prim packages first
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_util_pkg.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_mubi_pkg.sv
@@ -67,6 +70,8 @@ ${REPO_ROOT}/design/otbn/prim/rtl/prim_subreg_shadow.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_reg_we_check.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_secded_inv_39_32_enc.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_secded_inv_39_32_dec.sv
+${REPO_ROOT}/design/otbn/prim/rtl/prim_secded_inv_64_57_enc.sv
+${REPO_ROOT}/design/otbn/prim/rtl/prim_secded_inv_64_57_dec.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_ram_1p_adv.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_ram_1p_scr.sv
 ${REPO_ROOT}/design/otbn/prim/rtl/prim_lfsr.sv
