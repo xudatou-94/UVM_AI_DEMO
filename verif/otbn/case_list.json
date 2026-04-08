@@ -1,0 +1,20 @@
+{
+    "cases": [
+        {
+            "case_id":      "otbn_0001",
+            "case_name":    "otbn_smoke",
+            "case_tag":     ["smoke", "basic"],
+            "case_seq":     "otbn_smoke_test",
+            "case_define":  [],
+            "case_timeout": 1800
+        },
+        {
+            "case_id":      "otbn_0002",
+            "case_name":    "otbn_dmem_rw",
+            "case_tag":     ["smoke", "dmem", "basic"],
+            "case_seq":     "otbn_dmem_rw_test",
+            "case_define":  [],
+            "case_timeout": 1800
+        }
+    ]
+}
