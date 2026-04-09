@@ -4,6 +4,65 @@
 
 ---
 
+## 首次运行（完整步骤）
+
+### 1. 安装仿真器
+
+```bash
+# Icarus Verilog（免费，推荐本地调试）
+sudo apt install iverilog
+
+# 验证安装
+iverilog -V
+```
+
+> 若使用 VCS，先执行 `source ../../scripts/setup.sh` 配置 License 和路径。
+
+### 2. 安装 Python 依赖
+
+建议使用虚拟环境：
+
+```bash
+cd verif/sjtag2apb_cocotb/
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+验证安装：
+
+```bash
+cocotb-config --version
+```
+
+### 3. 运行全部测试
+
+```bash
+# 在 verif/sjtag2apb_cocotb/ 目录下
+make
+
+# 使用 VCS
+make SIM=vcs
+```
+
+正常输出示例：
+
+```
+     0.00ns INFO     Running on Icarus Verilog version 11.0
+     0.00ns INFO     cocotb version 1.8.1
+  ...
+  200.00ns INFO     IDCODE = 0x0A5A5001
+  ...
+PASSED  tests/test_smoke.py::test_tap_reset_idcode
+PASSED  tests/test_smoke.py::test_idcode_repeated
+...
+10 passed in X.XXs
+```
+
+---
+
 ## 环境依赖
 
 ```bash
