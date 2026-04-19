@@ -1,303 +1,232 @@
 # RSA 硬件加速器 规格说明书
 
 **版本**：v0.1 草稿  
-**场景定位**：安全加速卡（PCIe 独立卡，面向 TLS/PKI/代码签名场景）  
-**目标标准**：FIPS 140-3 Level 3
+**最后更新**：2026-04-19  
+**场景定位**：安全加速卡（已确认）
 
 ---
 
-## 1. 用例与性能目标
+## 决策记录
 
-### 1.1 典型使用场景
-
-| 场景 | 操作 | 说明 |
-|------|------|------|
-| TLS 握手卸载 | RSA-2048 私钥解密 / 签名 | HTTPS 服务器高并发场景 |
-| PKI 证书签发 | RSA-2048/4096 CA 签名 | 离线 CA / OCSP Responder |
-| 代码签名 | RSA-2048/4096 + SHA-256 | 固件/软件签名流水线 |
-| 密钥协商 | RSA-2048 公钥加密 | 会话密钥传输（非主流，备选） |
-
-### 1.2 性能指标（目标）
-
-| 算法 | 操作 | 目标吞吐 | 备注 |
-|------|------|---------|------|
-| RSA-2048 | 私钥签名（CRT） | ≥ 4,000 ops/s | 单核 |
-| RSA-2048 | 公钥验签 | ≥ 40,000 ops/s | e=65537 |
-| RSA-4096 | 私钥签名（CRT） | ≥ 800 ops/s | 单核 |
-| RSA-4096 | 公钥验签 | ≥ 8,000 ops/s | e=65537 |
-
-> 参考：Thales Luna 7 HSM：RSA-2048 ~3,000 sign/s；设计目标略高于行业基准。
-
-### 1.3 延迟目标
-
-| 算法 | 单次签名延迟 |
-|------|------------|
-| RSA-2048 | < 250 µs |
-| RSA-4096 | < 1.2 ms |
+| # | 决策项 | 状态 | 结论 |
+|---|--------|------|------|
+| 1 | 产品定位 | ✅ 已确认 | 安全加速卡 |
+| 2 | 支持算法范围 | ⬜ TBD | — |
+| 3 | 支持 Key 长度 | ⬜ TBD | — |
+| 4 | 支持操作类型 | ⬜ TBD | — |
+| 5 | Padding 方案 | ⬜ TBD | — |
+| 6 | 性能目标（ops/s） | ⬜ TBD | — |
+| 7 | 工艺节点 / 目标频率 | ⬜ TBD | — |
+| 8 | 主机接口类型 | ⬜ TBD | — |
+| 9 | 密钥槽数量 | ⬜ TBD | — |
+| 10 | 安全等级（FIPS 140-3 Level） | ⬜ TBD | — |
+| 11 | 是否内置 TRNG | ⬜ TBD | — |
+| 12 | 是否内置 Hash 引擎 | ⬜ TBD | — |
+| 13 | 功耗预算 | ⬜ TBD | — |
+| A | 私钥模幂算法 | ✅ 已确认 | Montgomery Ladder + CRT + exponent/message blinding |
+| B | 公钥模幂算法 | ⬜ TBD | — |
+| C | 模乘算法 | ⬜ TBD | — |
+| D | 数据通路位宽（MAC） | ⬜ TBD | — |
+| E | 控制方式（FSM / 微码） | ⬜ TBD | — |
 
 ---
 
-## 2. 算法层选型
+## 1. 产品定位
 
-### 2.1 模幂算法
-
-**选定：Montgomery Ladder（防护优先）**
-
-- 常数时间执行，不依赖私钥 bit 值做分支，天然抗 SPA
-- 相比 Sliding Window 吞吐稍低，但安全加速卡场景安全优先
-- 公钥验签（e=65537，仅 17 bit）可走快速路径
-
-```
-私钥签名：Montgomery Ladder + CRT + exponent blinding
-公钥加密/验签：Square-and-Multiply（e 固定 65537，5次平方+1次乘）
-```
-
-### 2.2 模乘算法
-
-**选定：Montgomery Multiplication（64-bit MAC 阵列）**
-
-- 消除除法，全部转为乘加操作
-- 基本单元：64×64-bit 乘加，支持最大 4096-bit 操作数
-- 操作数分解：2048-bit = 32 个 64-bit limb；4096-bit = 64 个 64-bit limb
-- 使用 Interleaved Montgomery：每轮迭代处理 1 个 limb，减少临时存储
-
-### 2.3 CRT 优化
-
-对私钥签名启用 CRT：
-```
-mp = m^dp mod p    （1024 或 2048-bit 模幂）
-mq = m^dq mod q
-m  = CRT_combine(mp, mq, p, q, qInv)
-```
-吞吐约 **4× 提升**。必须配套 **CRT 故障检测**（见第 4 节）。
-
-### 2.4 Hash 协处理
-
-内置 SHA-256 / SHA-384 / SHA-512 硬件单元，支持 PKCS#1 v1.5 和 PSS padding，
-减少主机 PCIe 往返延迟。
+**安全加速卡**：以独立硬件卡形式插入服务器，通过主机接口（TBD）卸载 CPU 的非对称加密运算。典型场景（待决策后进一步细化）：TLS 握手卸载、PKI 证书签发、代码签名、密钥管理。
 
 ---
 
-## 3. 微架构
+## 2. 算法层
 
-### 3.1 顶层框图
+### 2.1 私钥模幂算法（已确认）
+
+**选定：Montgomery Ladder + CRT + exponent/message blinding**
 
 ```
-┌─────────────────────────────────────────────────┐
-│                RSA Accelerator                  │
-│                                                 │
-│  ┌─────────┐   ┌───────────────────────────┐   │
-│  │  PCIe   │   │      Control Unit         │   │
-│  │ DMA/IF  │──▶│  (Micro-sequencer / FSM)  │   │
-│  └─────────┘   └────────┬─────────┬─────────┘   │
-│                         │         │             │
-│               ┌─────────▼──┐  ┌───▼──────────┐  │
-│               │  Operand   │  │ Montgomery   │  │
-│               │  RAM Bank  │  │   Mul Unit   │  │
-│               │ (A/B/N/TMP)│  │(64×64 MAC×2) │  │
-│               └─────────┬──┘  └───┬──────────┘  │
-│                         └────┬────┘             │
-│                         ┌────▼─────┐            │
-│                         │  Adder / │            │
-│                         │ Reducer  │            │
-│                         └──────────┘            │
-│                                                 │
-│  ┌───────────┐   ┌─────────┐   ┌─────────────┐  │
-│  │  SHA-2    │   │  TRNG   │   │  Key Vault  │  │
-│  │  Engine   │   │(entropy)│   │  (OTP/SRAM) │  │
-│  └───────────┘   └─────────┘   └─────────────┘  │
-└─────────────────────────────────────────────────┘
+私钥路径（签名 / 解密）：
+  1. Exponent blinding：d' = d + r · λ(n)，r 为每次新鲜随机数
+  2. Message blinding ：m' = m · r_m^e mod n
+  3. CRT 分解：
+       mp = m'^dp mod p   （1024-bit 或 TBD-bit 模幂）
+       mq = m'^dq mod q
+  4. 每一次模幂采用 Montgomery Ladder 实现（常数时间）
+  5. CRT 合并：s' = CRT_combine(mp, mq, p, q, qInv)
+  6. 去除 blinding：s = s' / r_m mod n
+  7. Fault check（Bellcore 防护）：验证 s^e mod n == H(m)，
+     不通过则 zeroize 并触发 FATAL 告警，禁止输出
 ```
 
-### 3.2 数据通路
+安全属性：
+- 常数时间执行（无 key-bit 分支）→ 抵抗 SPA / timing attack
+- Exponent blinding → 抵抗 DPA / template attack
+- Message blinding → 抵抗 chosen-ciphertext DPA
+- CRT fault check → 抵抗 Bellcore 故障注入攻击
 
-| 参数 | 值 | 说明 |
-|------|----|------|
-| MAC 位宽 | 64×64-bit | 平衡面积与频率 |
-| 并行 MAC 数 | 2 | CRT 两半（p路/q路）可并行 |
-| 操作数 SRAM | 4 bank × 4 KB | 存 A、B、N、TMP，支持双端口 |
-| 临时寄存器 | 8×256-bit | 模乘中间值 |
-| 目标频率 | 400 MHz | TSMC 28nm HPC 目标 |
+### 2.2 公钥模幂算法（TBD）
 
-### 3.3 控制方式
+待决策。候选：
+- Square-and-Multiply（e=65537 公开，无需防护，极快）
+- 其他
 
-**选定：Micro-sequencer（可编程微码，只读 ROM）**
+### 2.3 其余算法参数（TBD）
 
-原因：
-- 比纯 FSM 灵活，可支持 RSA + 未来 ECC（P-256/P-384）
-- ROM 固化，防止运行时代码注入（与 OTBN 思路相同）
-- 指令集针对大数运算优化（MODMUL / MODADD / MODSUB / COPY / BR）
-
-RSA 签名微码流程（伪码）：
-```
-LOAD  p, q, dp, dq, qInv, m   ; 从 Key Vault & DMA 加载
-BLIND e_blind = blinding(dp, rng)  ; exponent blinding
-MODMUL_LADDER mp = m^e_blind mod p ; Montgomery Ladder 模幂
-MODMUL_LADDER mq = m^e_blind mod q
-CRT   s = combine(mp, mq, p, q, qInv)
-VERIFY s^e mod n == m           ; CRT fault check
-OUTPUT s
-ZEROIZE tmp                     ; 归零中间值
-```
+- 模乘算法：TBD（候选：Montgomery Multiplication）
+- 数据通路位宽：TBD
+- 控制方式（FSM / 微码）：TBD
 
 ---
 
-## 4. 安全设计
+## 3. 微架构（TBD）
 
-### 4.1 侧信道防护（SCA）
-
-| 威胁 | 防护措施 |
-|------|---------|
-| SPA（简单功耗分析） | Montgomery Ladder 常数时间；禁止以 key bit 做分支 |
-| DPA（差分功耗） | **Exponent Blinding**：`d' = d + r·λ(n)`，r 每次新鲜随机 |
-| Message Blinding | 签名前 `m' = m · r^e mod n`，签名后除以 r |
-| Timing Attack | 所有操作固定 limb 循环次数，不做 early-exit |
-| EM 攻击 | 规则访存模式，操作数 RAM 访问序列与 key 无关 |
-
-### 4.2 故障注入防护（FIA）
-
-| 威胁 | 防护措施 |
-|------|---------|
-| CRT 故障（Bellcore attack） | 输出前强制 `verify: s^e mod n == H(m)`，不通过则清零并报警 |
-| 寄存器翻转 | FSM 状态寄存器 Hamming ECC 编码（SEC-DED） |
-| SRAM 翻转 | 操作数 SRAM 加 Parity，关键操作数（d、p、q）加 ECC |
-| 时钟毛刺 | 片上 PLL 监测器；检测到异常频率立即 zeroize |
-| 电压毛刺 | 片上 LDO + 过压/欠压检测传感器 |
-| 温度探针 | 温度传感器，超温触发安全清零 |
-
-### 4.3 密钥保护
-
-- 私钥 `(d, p, q, dp, dq, qInv)` **不可导出**芯片
-- Key Vault：专用 SRAM + 硬件清零指令（`ZEROIZE`）
-- 支持 Key Wrapping（AES-256-GCM 加密导入）
-- 密钥生命周期：loaded → active → zeroized，状态机强制单向
-- Power-on：自动 zeroize，防冷启动攻击
-
-### 4.4 DFT 安全
-
-- 生产模式下 scan chain **强制禁用**（由 OTP fuse 控制）
-- scan 路径不可观测 Key Vault 和中间运算寄存器
-- JTAG 在安全模式下仅保留 IDCODE；调试接口需认证密钥解锁
+待算法层决策完成后填写。
 
 ---
 
-## 5. 主机接口
+## 4. 安全设计（TBD）
 
-### 5.1 物理接口
+威胁模型和防护措施将在确认安全等级（FIPS 140-3 Level）后细化。
+私钥模幂路径的防护已在 2.1 节明确。
 
-**选定：PCIe Gen3 x4（安全加速卡标准形态）**
+---
 
-- 带宽：~16 Gbps，远超 RSA 数据搬运需求（单次操作 < 1 KB）
-- 延迟：~1 µs PCIe 往返，加速效果明显
-- 备选：PCIe Gen4 x4（向前兼容）
+## 5. 主机接口（TBD）
 
-### 5.2 软件接口
+接口类型、寄存器映射、DMA 设计待决策 #8 确认后填写。
 
+---
+
+## 6. 验证计划（TBD）
+
+待 RTL 架构基本成形后，参考 sjtag2apb 验证框架制定。
+
+---
+
+---
+
+# 附录 A：模幂算法对比（参考资料）
+
+## A.1 背景
+
+RSA 的核心操作是 `c = m^e mod n`，其中 `e` 和 `n` 为 2048~4096 bit 大数。
+不可先算 `m^e` 后取模（中间值为天文数字），必须按 `e` 的二进制位逐步迭代，
+每步做**平方**和**乘法**并立刻模 `n`。
+一次模幂 ≈ O(log e) 次模乘，对 2048-bit key 约 **3000 次大数模乘**。
+算法目标：用最少模乘次数、最安全的方式完成这一迭代。
+
+---
+
+## A.2 Square-and-Multiply（平方-乘法法）
+
+逐 bit 扫描指数，每位做一次平方，bit=1 时再做一次乘法。
+
+```python
+result = 1
+for bit in bits(d, high_to_low):
+    result = result^2 mod n          # 每轮必做
+    if bit == 1:
+        result = result * m mod n    # 仅 bit=1 时做
 ```
-Host
- │
- ├── MMIO 寄存器空间（BAR0，4 KB）
- │     CMD / STATUS / IRQ_EN / IRQ_STATUS
- │     KEY_CTRL / KEY_STATUS
- │     ERR_CODE / ALARM_STATUS
- │
- └── DMA 数据通道（BAR1，64 KB）
-       INPUT_BUF  : 明文/密文数据
-       OUTPUT_BUF : 签名结果/解密结果
-       KEY_LOAD   : 加密密钥导入（只写）
-```
 
-### 5.3 寄存器映射（顶层）
-
-| 偏移 | 名称 | 访问 | 说明 |
-|------|------|------|------|
-| 0x00 | CHIP_ID | RO | 芯片 ID 和版本 |
-| 0x04 | CMD | WO | 操作命令（见下表） |
-| 0x08 | STATUS | RO | 当前状态 |
-| 0x0C | CTRL | RW | 配置（key_len/op_mode/irq_en） |
-| 0x10 | IRQ_STATUS | RW1C | 中断状态 |
-| 0x14 | ERR_CODE | RO | 错误码（含 CRT_FAIL/SCA_ALARM 等） |
-| 0x18 | KEY_CTRL | WO | 密钥操作（load/zeroize/select） |
-| 0x1C | KEY_STATUS | RO | 密钥槽状态 |
-| 0x20 | ALARM_STATUS | RO | 安全告警（glitch/temp/voltage） |
-| 0x24 | PERF_CNT | RO | 完成操作计数（调试用） |
-
-**CMD 编码**：
-
-| 值 | 操作 |
+| 项 | 评价 |
 |----|------|
-| 0x01 | RSA_SIGN（私钥签名，启用 CRT + blinding） |
-| 0x02 | RSA_VERIFY（公钥验签） |
-| 0x03 | RSA_ENCRYPT（公钥加密） |
-| 0x04 | RSA_DECRYPT（私钥解密，启用 CRT + blinding） |
-| 0x10 | KEY_LOAD（从 DMA 缓冲区导入加密密钥） |
-| 0x11 | KEY_ZEROIZE（清除指定密钥槽） |
-| 0x20 | SELF_TEST（FIPS 上电自检） |
+| 2048-bit 模乘次数 | 平均 ~3072 次 |
+| 硬件实现 | 极简，小型 FSM |
+| **致命缺陷** | 分支依赖 key bit，SPA 可直接读出私钥 d |
+| 适用 | 公钥路径（e=65537 公开，无需防护）✅；私钥路径 ❌ |
 
 ---
 
-## 6. 随机数需求
+## A.3 Montgomery Ladder（蒙哥马利阶梯法）
 
-- 内置 **TRNG**（基于热噪声环振荡器）
-- 输出经 AES-CTR_DRBG 处理后供 blinding 使用（NIST SP 800-90A）
-- TRNG 健康检测：Repetition Count Test + Adaptive Proportion Test（NIST SP 800-90B）
-- 每次签名操作需新鲜随机数：`r`（message blinding）+ `r'`（exponent blinding），共 2 × key_len/2 bits
+无论 bit 为 0 还是 1，操作序列完全相同，只是变量互换。
 
----
+```python
+R0, R1 = 1, m
+for bit in bits(d, high_to_low):
+    if bit == 0:
+        R1 = R0 * R1 mod n;  R0 = R0^2 mod n
+    else:
+        R0 = R0 * R1 mod n;  R1 = R1^2 mod n
+```
 
-## 7. 错误与告警分级
-
-| 级别 | 事件 | 响应 |
-|------|------|------|
-| **FATAL** | CRT 验证失败 / glitch 检测 / 温度/电压异常 | 立即 zeroize 所有密钥；芯片锁定，需硬件复位 |
-| **RECOVERABLE** | SRAM 单 bit ECC 纠正 / DMA 超时 | 报 IRQ，当前操作中止，芯片可继续工作 |
-| **INFO** | 操作完成 / TRNG 重新播种 | 正常 IRQ 通知 |
-
----
-
-## 8. 工艺与功耗
-
-| 参数 | 目标值 |
-|------|--------|
-| 工艺节点 | TSMC 28nm HPC（或同等） |
-| 目标频率 | 400 MHz |
-| 核心面积（估算） | ~2 mm²（不含 PCIe PHY） |
-| 动态功耗（峰值） | < 500 mW（RSA-2048 满负荷） |
-| 待机功耗 | < 50 mW（clock gating） |
+| 项 | 评价 |
+|----|------|
+| 2048-bit 模乘次数 | 恒定 ~4096 次（比 S&M 慢 ~30%） |
+| 抗 SPA | ✅ 天然常数时间 |
+| 抗 DPA | △（需配合 blinding） |
+| 硬件实现 | 需两组寄存器，控制简单 |
+| 适用 | **私钥路径首选** ✅ |
 
 ---
 
-## 9. 验证计划（概要）
+## A.4 Sliding Window（滑动窗口法）
 
-| 层次 | 方法 | 工具 |
-|------|------|------|
-| 单元级 | UVM + 定向测试 | VCS / Questa |
-| 子系统级 | UVM + cocotb | 模乘单元与参考模型对拍 |
-| 顶层 | SystemVerilog TB | NIST CAVS KAT 向量全量回归 |
-| 安全验证 | 形式化（常数时间性） | FIVER / Coco |
-| 侧信道仿真 | Power trace 前仿 | TVLA + VCS power 估计 |
-| 故障注入 | Bit-flip 注入仿真 | 自定义 FI framework |
+一次处理 `w` 个 bit，预计算 `m^1, m^3, m^5...` 存表，遇到 1-run 整体乘一次。
 
-### 9.1 关键测试向量
-
-- NIST FIPS 186-5 RSA 签名/验签向量
-- OpenSSL 交叉验证（`openssl dgst -sign / -verify`）
-- CRT fault injection：注入单 bit 翻转，验证 FATAL 告警触发并且不输出错误签名
-- Blinding 验证：相同输入两次签名，中间值不同但结果相同
+| 项 | 评价 |
+|----|------|
+| 2048-bit 模乘次数（w=4） | ~2560 次（比 S&M 快 ~17%，比 Ladder 快 ~37%） |
+| 预计算开销 | 2^(w-1) 个表项，需额外 SRAM |
+| **安全缺陷** | 0-run 跳过长度与 d 相关 → timing leak；表地址泄露 key |
+| 适用 | 需配合 blinding + 固定访问模式，适合性能优先场景 |
 
 ---
 
-## 10. 开放问题（待决策）
+## A.5 Fixed Window / m-ary（固定窗口法）
 
-| # | 问题 | 候选方案 | 影响 |
-|---|------|---------|------|
-| 1 | 是否支持 ECC（P-256/P-384）？ | A. 仅 RSA；B. 通用大数协处理器 | 面积 +20~40%，但未来扩展性强 |
-| 2 | 密钥槽数量？ | 4 / 8 / 16 | 影响 Key Vault SRAM 大小 |
-| 3 | 是否支持 RSA-1024 Legacy？ | 是/否 | FIPS 已不推荐，增加兼容测试成本 |
-| 4 | 多核并行（2个加速核）？ | 是/否 | 吞吐 ×2，面积 ×1.8 |
-| 5 | PKCS#1 v1.5 还是 PSS 或两者都支持？ | 都支持 | padding 逻辑复杂度增加 |
-| 6 | PCIe Gen4 向前兼容？ | 是/否 | PHY IP 选型影响 |
+Sliding Window 变体：强制窗口宽度固定，不跳 0-run。
+
+| 项 | 评价 |
+|----|------|
+| 2048-bit 模乘次数（w=4） | ~2560 次 |
+| 抗 SPA | △（无跳 0 分支，比 Sliding Window 好） |
+| 抗 DPA | △（查表地址仍和 key 相关，需 cache 混淆） |
+| 适用 | 高吞吐 TLS 场景，配合访问混淆 |
 
 ---
 
-*下一步：根据开放问题的决策更新 v0.2，然后进入 RTL 微架构详细设计（模乘单元 / 控制器 / Key Vault）。*
+## A.6 Montgomery Ladder + Randomization（最高防护级别）
+
+Ladder 的增强版：每步增加"哑操作"扰动功耗/时序。
+
+| 项 | 评价 |
+|----|------|
+| 2048-bit 模乘次数 | ~4500 次（比 Ladder 再慢 10~20%） |
+| 抗 SPA / DPA / 高阶攻击 | ✅ 最强 |
+| 适用 | FIPS 140-3 Level 4 / CC EAL 5+ 场景 |
+
+---
+
+## A.7 CRT（中国剩余定理）加速
+
+**不是独立的模幂算法，而是私钥侧的分解加速技巧**：
+
+```
+mp = m^dp mod p    （≈1/4 的计算量）
+mq = m^dq mod q   （≈1/4 的计算量）
+s  = CRT_combine(mp, mq)
+```
+
+| 项 | 评价 |
+|----|------|
+| 性能提升 | **~4×**（两个半长模幂并行时可接近） |
+| **安全风险** | Bellcore CRT 故障攻击：单 bit 错误可还原私钥 |
+| 必备防护 | 输出前校验 `s^e mod n == m`，失败则 FATAL |
+| 适用 | 私钥路径几乎必选（业界标准）✅ |
+
+---
+
+## A.8 综合对比
+
+| 算法 | 2048-bit 模乘次数 | 抗 SPA | 抗 DPA | 硬件复杂度 | 推荐场景 |
+|------|:----------------:|:------:|:------:|:---------:|---------|
+| Square-and-Multiply | ~3072 | ❌ | ❌ | ⭐ | 公钥路径 |
+| Montgomery Ladder | ~4096 | ✅ | △ | ⭐⭐ | **私钥路径（本项目选定）** |
+| Sliding Window (w=4) | ~2560 | ❌ | ❌ | ⭐⭐ | 不推荐（安全加速卡） |
+| Fixed Window (w=4) | ~2560 | △ | △ | ⭐⭐⭐ | 高吞吐 TLS 场景 |
+| Ladder + Randomization | ~4500 | ✅ | ✅ | ⭐⭐⭐⭐ | 最高安全等级 |
+| CRT（组合 Ladder 使用） | 含 CRT 后 ~2×faster | — | — | 需 Fault Check | **私钥路径标配加速** |
+
+> **本项目私钥路径最终选定**：**Montgomery Ladder + CRT + exponent/message blinding**（A 方案）
+> 安全与性能的最佳平衡，为业界安全加速卡主流方案。
