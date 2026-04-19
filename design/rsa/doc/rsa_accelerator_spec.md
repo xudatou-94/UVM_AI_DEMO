@@ -24,7 +24,7 @@
 | 12 | 是否内置 Hash 引擎 | ⬜ TBD | — |
 | 13 | 功耗预算 | ⬜ TBD | — |
 | A | 私钥模幂算法 | ✅ 已确认 | Montgomery Ladder + CRT + exponent/message blinding |
-| B | 公钥模幂算法 | ⬜ TBD | — |
+| B | 公钥模幂算法 | ✅ 已确认 | **复用 Montgomery Ladder**（零新增硬件） |
 | C | 模乘算法 | ⬜ TBD | — |
 | D | 数据通路位宽（MAC） | ⬜ TBD | — |
 | E | 控制方式（FSM / 微码） | ⬜ TBD | — |
@@ -129,11 +129,37 @@
 - Message blinding → 抵抗 chosen-ciphertext DPA
 - CRT fault check → 抵抗 Bellcore 故障注入攻击
 
-### 2.2 公钥模幂算法（TBD）
+### 2.2 公钥模幂算法（已确认：复用 Montgomery Ladder）
 
-待决策。候选：
-- Square-and-Multiply（e=65537 公开，无需防护，极快）
-- 其他
+```
+公钥路径（验签 / 加密）：
+  直接调用和私钥相同的 Montgomery Ladder 模幂电路，
+  仅循环次数由 2048 bit（私钥）切换为 17 bit（e=65537）。
+  不启用 blinding、不启用 CRT。
+```
+
+参数：
+
+| 项 | 值 |
+|----|----|
+| 指数 e | 固定 65537（0x10001，17 bit） |
+| 模幂位宽 | 2048 bit |
+| 循环次数 | 17 次 Ladder 迭代（每次 2 个模乘） |
+| 模乘次数 | ~34 次（相比 Square-and-Multiply 多一倍，但绝对延迟极小） |
+| Blinding | 不启用（e 公开，无侧信道风险） |
+| CRT | 不启用（公钥路径无 p/q） |
+
+选型原因：
+
+- **零新增硬件**：完全复用私钥路径的 Montgomery Ladder FSM 与模乘单元
+- 仅需在顶层 FSM 通过 `key_type`（公钥/私钥）切换：
+  * 循环计数（17 vs 2048）
+  * Blinding 使能
+  * CRT 使能
+- 虽然理论上 Square-and-Multiply 只需 17 次模乘（比 Ladder 快 ~2×），
+  但公钥路径总时长仍远小于私钥路径（~1/1000 量级），
+  多做 17 次模乘对整体 latency 无实质影响
+- 原型阶段"一套电路管两条路径"极大降低验证与调试复杂度
 
 ### 2.3 其余算法参数（TBD）
 
