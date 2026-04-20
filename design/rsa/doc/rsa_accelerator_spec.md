@@ -18,7 +18,7 @@
 | 6 | 性能目标（ops/s） | ✅ 已确认 | **≥ 20 RSA-2048 Sign ops/s**（教学/Demo） |
 | 7 | 工艺节点 / 目标频率 | ✅ 已确认 | **仅 RTL 仿真**，不绑定工艺；标称频率 100 MHz |
 | 8 | 主机接口类型 | ✅ 已确认 | **纯 APB 32-bit**（控制 + operand 都走 APB） |
-| 9 | 密钥槽数量 | ⬜ TBD | — |
+| 9 | 密钥槽数量 | ✅ 已确认 | **0 槽**（不做 Key Vault，operand 每次 APB 写入） |
 | 10 | 安全等级（FIPS 140-3 Level） | ⬜ TBD | — |
 | 11 | 是否内置 TRNG | ⬜ TBD | — |
 | 12 | 是否内置 Hash 引擎 | ⬜ TBD | — |
@@ -380,6 +380,30 @@ start / done 握手启动下层 FSM：
 - 非法地址访问 → PSLVERR=1
 - busy 状态下试图重写 CMD → PSLVERR=1
 - operand 未写全就启动运算 → 运算自行报 ERR_CODE（不通过 PSLVERR）
+
+### 5.5 密钥存储（已确认：0 槽，不做 Key Vault）
+
+本版本**不在芯片内保存任何密钥状态**。
+
+| 项 | 设定 |
+|----|------|
+| 内置 Key Vault SRAM | 无 |
+| 密钥槽数量 | 0 |
+| 密钥生命周期管理 | 无 |
+| ZEROIZE 指令 | 无（operand 寄存器在每次 `done` 后自动清零） |
+
+行为：
+- 每次 Sign / Decrypt / Verify / Encrypt，软件必须通过 APB **完整写入** 所有 operand
+  （`n / e` 或 `n / p / q / dp / dq / qInv`，以及 `m` 或 `c`）
+- 运算完成、结果读出后，硬件自动清除内部 operand 寄存器
+- 下一次操作必须重新写入 key
+
+理由：
+- 匹配"简单电路"原型定位（决策 #1）
+- 决策 #5（仅 Raw 模幂）已将密钥管理交给软件层
+- 省去 Key Vault + 索引管理 + 密钥生命周期 FSM + zeroize 指令，RTL 复杂度大降
+- 与决策 #10（安全等级）解耦：有无 slot 不影响算法正确性
+- 后续产品化（如 HSM）时，可在新工程中增加 Key Vault 子模块，接口向前兼容
 
 ---
 
