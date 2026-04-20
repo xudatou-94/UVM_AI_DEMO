@@ -26,7 +26,7 @@
 | A | 私钥模幂算法 | ✅ 已确认 | Montgomery Ladder + CRT + exponent/message blinding |
 | B | 公钥模幂算法 | ✅ 已确认 | **复用 Montgomery Ladder**（零新增硬件） |
 | C | 模乘算法 | ✅ 已确认 | **Montgomery Multiplication (CIOS)** |
-| D | 数据通路位宽（MAC） | ⬜ TBD | — |
+| D | 数据通路位宽（MAC） | ✅ 已确认 | **32-bit MAC**（2048-bit 分 64 个 limb） |
 | E | 控制方式（FSM / 微码） | ⬜ TBD | — |
 
 ---
@@ -208,10 +208,31 @@ return A[0..k-1]
 - 模幂主循环 ~4000 次模乘中，入/出域各 1 次，开销完全可忽略
 - R 为 `2^k`（k = 模数位宽）；R² 可由硬件或软件在 key load 阶段预计算
 
-### 2.6 其余算法参数（TBD）
+### 2.6 数据通路位宽（已确认：32-bit MAC）
 
-- 数据通路位宽（MAC 单元 bit 数）：TBD（决策 D）
-- 控制方式（FSM / 微码）：TBD（决策 E）
+**limb 位宽 w = 32**，是 CIOS 乘加单元 `A[j] = A[j] + a[j]·b[i] + Carry` 的基本粒度。
+
+| 项 | 值 |
+|----|----|
+| MAC 位宽 w | 32 bit |
+| 乘法器规模 | 32×32 → 64 bit（单拍完成） |
+| 加法器 | 64-bit 累加 + 32-bit Carry 链 |
+| 2048-bit limb 数 k | 64 |
+| 1024-bit（CRT 半宽）limb 数 | 32 |
+| 单次 MontMul 周期（CIOS） | ~k² ≈ 4096（2048-bit）；~1024（1024-bit） |
+| 单次 RSA-2048 签名模乘次数 | ≈ 4×1024 = 4096（Ladder×CRT 两半）|
+| 单次 RSA-2048 签名总周期 | ≈ 4096 × 1024 ≈ 4.2M cycles（CRT 串行）|
+
+### 2.7 选型理由
+
+- **32×32 乘法器**是主流工艺中的"甜点"：单拍完成、面积适中、时序友好
+- **64 个 limb** 让 CIOS 两层循环结构清晰，便于 FSM 实现和调试
+- 性能虽非最高，但原型阶段"功能先行"：100 MHz 下 RSA-2048 签名 ~40 ms，
+  demo 充分够用
+- 后续升级 64-bit MAC 仅涉及乘法器和 limb 循环计数参数，CIOS 算法不变，扩展成本低
+- 16-bit MAC 虽面积更小，但周期数翻 4 倍（~16M cycles），验证和功耗都不划算
+
+### 2.8 控制方式（TBD 决策 E）
 
 ---
 
