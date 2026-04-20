@@ -20,7 +20,7 @@
 | 8 | 主机接口类型 | ✅ 已确认 | **纯 APB 32-bit**（控制 + operand 都走 APB） |
 | 9 | 密钥槽数量 | ✅ 已确认 | **0 槽**（不做 Key Vault，operand 每次 APB 写入） |
 | 10 | 安全等级（FIPS 140-3 Level） | ✅ 已确认 | **不声明 FIPS 等级**（仅保留 Ladder 常数时间属性） |
-| 11 | 是否内置 TRNG | ⬜ TBD | — |
+| 11 | 是否内置 TRNG | ✅ 已确认 | **不内置**，但顶层预留 `rand_in[31:0]` 接口 |
 | 12 | 是否内置 Hash 引擎 | ⬜ TBD | — |
 | 13 | 功耗预算 | ⬜ TBD | — |
 | A | 私钥模幂算法 | ✅ 已确认 | Montgomery Ladder + CRT + exponent/message blinding |
@@ -367,6 +367,30 @@ start / done 握手启动下层 FSM：
 ```
 
 blinding / fault check 作为已知的扩展点，在决策 #11（TRNG）与后续产品化工程中再启用。
+
+### 4.4 TRNG 接口（已确认：不内置，预留端口）
+
+本版本**不实现 TRNG**，但顶层预留随机数输入接口，方便后续产品化工程挂载
+外部 TRNG 模块（或 AES-CTR_DRBG）而**无须修改顶层 port 签名**。
+
+顶层接口（RTL 设计阶段可按需调整命名，接口语义保持一致）：
+
+| 信号 | 方向 | 位宽 | 说明 |
+|------|------|-----|------|
+| `rand_in` | in | 32 | 来自外部 TRNG 的随机字 |
+| `rand_valid` | in | 1 | `rand_in` 有效（握手信号） |
+| `rand_req` | out | 1 | 加速器请求一个新随机字 |
+
+本版本中：
+
+- 加速器内部**不产生 `rand_req` 脉冲**（blinding 未启用）
+- `rand_in` / `rand_valid` 在 RTL 中仅作为未使用输入保留，顶层测试台可驱动固定值（如 `32'h0`）
+- Lint 层面用 `unused_signal` 或 `/* verilator lint_off UNUSED */` 忽略告警
+
+优点：
+- 未来启用 blinding 时，顶层 port 列表不变，只需在内部 FSM 加 `rand_req` 驱动逻辑
+  并消费 `rand_in`，接口协议稳定
+- 测试台（UVM / cocotb）可提前建立随机数驱动，减少后续重构成本
 
 ---
 
