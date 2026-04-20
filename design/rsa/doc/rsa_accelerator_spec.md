@@ -27,7 +27,7 @@
 | B | 公钥模幂算法 | ✅ 已确认 | **复用 Montgomery Ladder**（零新增硬件） |
 | C | 模乘算法 | ✅ 已确认 | **Montgomery Multiplication (CIOS)** |
 | D | 数据通路位宽（MAC） | ✅ 已确认 | **32-bit MAC**（2048-bit 分 64 个 limb） |
-| E | 控制方式（FSM / 微码） | ⬜ TBD | — |
+| E | 控制方式（FSM / 微码） | ✅ 已确认 | **纯 FSM**（三层嵌套状态机） |
 
 ---
 
@@ -232,7 +232,30 @@ return A[0..k-1]
 - 后续升级 64-bit MAC 仅涉及乘法器和 limb 循环计数参数，CIOS 算法不变，扩展成本低
 - 16-bit MAC 虽面积更小，但周期数翻 4 倍（~16M cycles），验证和功耗都不划算
 
-### 2.8 控制方式（TBD 决策 E）
+### 2.8 控制方式（已确认：纯 FSM，三层嵌套状态机）
+
+RSA 运算是天然的三层嵌套循环。本项目采用**三个分层 FSM** 实现，上层 FSM 通过
+start / done 握手启动下层 FSM：
+
+```
+          start      start      start
+ CMD ──▶ top_fsm ──▶ ladder_fsm ──▶ montmul_fsm
+          ◀─done     ◀─done       ◀─done
+```
+
+| 层 | FSM | 职责 | 循环次数 |
+|----|-----|------|---------|
+| 顶层 | `rsa_top_fsm` | 解析 CMD，私/公钥路径分支，CRT 合并、fault check、zeroize | 1 次（整条命令生命周期） |
+| 中层 | `ladder_fsm` | 扫描指数逐 bit 执行 Montgomery Ladder | 17 次（公钥）/ 1024 次（CRT 半，私钥）|
+| 底层 | `montmul_fsm` | CIOS 双层 limb 循环（外 i / 内 j + 约简） | ~k² 次 limb 步 |
+
+### 2.9 选型理由
+
+- 与决策 #2（仅 RSA）、决策 #5（仅 Raw 模幂）完全契合：**流程固定，无需灵活性**
+- 层次化 FSM 与嵌套循环结构一一对应，RTL 编写、仿真、调试都最直观
+- 面积最小（无 ROM、无译码器、无 PC），也便于功耗估计
+- 每层 FSM 状态数可控（~5~10 个状态），便于做形式化覆盖验证
+- 未来若扩展到 ECC/多算法，再新建工程考虑升级为微码或指令集，不影响当前原型
 
 ---
 
