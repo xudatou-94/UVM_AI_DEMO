@@ -17,7 +17,7 @@
 | 5 | Padding 方案 | ✅ 已确认 | **仅 Raw 模幂**（padding/Hash/RNG 由软件处理） |
 | 6 | 性能目标（ops/s） | ✅ 已确认 | **≥ 20 RSA-2048 Sign ops/s**（教学/Demo） |
 | 7 | 工艺节点 / 目标频率 | ✅ 已确认 | **仅 RTL 仿真**，不绑定工艺；标称频率 100 MHz |
-| 8 | 主机接口类型 | ⬜ TBD | — |
+| 8 | 主机接口类型 | ✅ 已确认 | **纯 APB 32-bit**（控制 + operand 都走 APB） |
 | 9 | 密钥槽数量 | ⬜ TBD | — |
 | 10 | 安全等级（FIPS 140-3 Level） | ⬜ TBD | — |
 | 11 | 是否内置 TRNG | ⬜ TBD | — |
@@ -327,9 +327,59 @@ start / done 握手启动下层 FSM：
 
 ---
 
-## 5. 主机接口（TBD）
+## 5. 主机接口（已确认：纯 APB 32-bit）
 
-接口类型、寄存器映射、DMA 设计待决策 #8 确认后填写。
+### 5.1 总线选型
+
+| 项 | 值 |
+|----|----|
+| 协议 | AMBA APB（推荐 APB3/APB4） |
+| 数据位宽 | 32-bit |
+| 地址位宽 | 12-bit（覆盖 4 KB 地址空间） |
+| 时钟域 | 单时钟（与加速器主时钟同步） |
+| 信号 | PSEL / PENABLE / PWRITE / PADDR / PWDATA / PRDATA / PREADY / PSLVERR |
+
+**选型理由**：
+- 本仓库 `verif/sjtag2apb` 与 `verif/sjtag2apb_cocotb` 已有完整 APB 验证资产，可直接复用驱动/监控
+- APB 协议无 burst、无 outstanding，最简单；读写逻辑几个 `always` 块即可
+- 原型吞吐 20 ops/s 下，operand 搬运开销远小于运算开销，无须 DMA / AXI burst
+
+### 5.2 地址空间总览（预规划，具体寄存器在 RTL 设计阶段细化）
+
+```
+0x000 ── 0x0FF : 控制 / 状态寄存器区
+   CMD        操作命令（Sign/Verify/Encrypt/Decrypt）
+   STATUS     当前状态（idle/busy/done/err）
+   CTRL       启动 / 中断使能
+   IRQ_STATUS 中断挂起 / W1C
+   ERR_CODE   错误码
+
+0x100 ── 0x3FF : Operand 写入窗口
+   按 32-bit 分拍写入 n / e / d / p / q / dp / dq / qInv / m
+   每个 2048-bit operand = 64 拍；每个 1024-bit operand = 32 拍
+
+0x400 ── 0x5FF : 结果读出窗口
+   32-bit 分拍读出 s / c（2048-bit，64 拍）
+```
+
+> 详细寄存器映射与偏移量将在 RTL 设计阶段（v0.2）给出。
+
+### 5.3 典型操作时序（Sign 为例）
+
+```
+1. 软件配置 CTRL、写入 operand (n, d, p, q, dp, dq, qInv, m)  ← APB 多拍写
+2. 软件写 CMD = SIGN                                              ← 一次 APB 写
+3. 加速器 STATUS 变 busy，开始 CRT + Ladder 运算
+4. 运算完成后 STATUS = done，若 IRQ_EN 触发 IRQ
+5. 软件轮询或响应 IRQ，从结果窗口读 s                             ← APB 多拍读
+6. 软件 W1C 清 IRQ_STATUS
+```
+
+### 5.4 PSLVERR 使用约定
+
+- 非法地址访问 → PSLVERR=1
+- busy 状态下试图重写 CMD → PSLVERR=1
+- operand 未写全就启动运算 → 运算自行报 ERR_CODE（不通过 PSLVERR）
 
 ---
 
