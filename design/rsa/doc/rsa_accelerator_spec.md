@@ -25,7 +25,7 @@
 | 13 | 功耗预算 | ⬜ TBD | — |
 | A | 私钥模幂算法 | ✅ 已确认 | Montgomery Ladder + CRT + exponent/message blinding |
 | B | 公钥模幂算法 | ✅ 已确认 | **复用 Montgomery Ladder**（零新增硬件） |
-| C | 模乘算法 | ⬜ TBD | — |
+| C | 模乘算法 | ✅ 已确认 | **Montgomery Multiplication (CIOS)** |
 | D | 数据通路位宽（MAC） | ⬜ TBD | — |
 | E | 控制方式（FSM / 微码） | ⬜ TBD | — |
 
@@ -161,11 +161,57 @@
   多做 17 次模乘对整体 latency 无实质影响
 - 原型阶段"一套电路管两条路径"极大降低验证与调试复杂度
 
-### 2.3 其余算法参数（TBD）
+### 2.3 模乘算法（已确认：Montgomery Multiplication — CIOS 变种）
 
-- 模乘算法：TBD（候选：Montgomery Multiplication）
-- 数据通路位宽：TBD
-- 控制方式（FSM / 微码）：TBD
+模乘是 RSA 的最热点基础操作：2048-bit 一次模幂 ≈ 4000 次 2048×2048 模乘（Ladder 下），
+所有 Ladder 迭代最终都调用它。
+
+**选定：Montgomery Multiplication — CIOS（Coarsely Integrated Operand Scanning）**
+
+核心思想：将"求模"替换为"移位"。数据先进入 Montgomery 域（`ā = a·R mod n`，
+`R = 2^k`），域内乘法时只需乘 + 加 + 右移，无需除法。
+
+CIOS 伪码（k = limb 数；单次模乘 `c = MontMul(a, b)`）：
+
+```
+A[0..k]  = 0                       // 临时累加器，长度 k+1 limb
+for i in 0..k-1:                   // 外层循环：逐 limb 扫描 b
+    (Carry, A[0])   = A[0] + a[0]·b[i]
+    for j in 1..k-1:               // 内层循环：乘法扩散
+        (Carry, A[j]) = A[j] + a[j]·b[i] + Carry
+    (Carry_h, A[k]) = A[k] + Carry
+    m = A[0] · n'[0] mod 2^w       // 约简乘子（n' 预计算：n·n' ≡ -1 mod 2^w）
+    (Carry, _)     = A[0] + m·n[0] // 使最低 limb 归零
+    for j in 1..k-1:               // 约简扩散
+        (Carry, A[j-1]) = A[j] + m·n[j] + Carry
+    A[k-1] = A[k] + Carry
+if A ≥ n:
+    A = A - n                      // 条件减：使结果落在 [0, n)
+return A[0..k-1]
+```
+
+### 2.4 CIOS 变种选型理由
+
+| 对比 | 选择 | 说明 |
+|------|------|------|
+| **朴素"先乘后除"** | ❌ | 硬件除法器关键路径极长，业界已淘汰 |
+| **Barrett Reduction** | ❌ | 每次模乘需 2 次全宽乘法；无明显优势 |
+| **Montgomery SOS** | ❌ | 乘法全做完再约简，需要 2k-limb 中间存储 |
+| **Montgomery CIOS** ✅ | 选用 | 乘/约简交替，中间仅 k+1 limb 寄存器；控制规则 |
+| **Montgomery FIOS** | ❌ | 更细粒度流水，控制复杂度高，不适合原型 |
+| **RNS Montgomery** | ❌ | 面积极大，服务器级吞吐卡方案，不适合原型 |
+
+### 2.5 Montgomery 域进/出转换
+
+- **入域**：`ā = a · R mod n`，等价于 `MontMul(a, R²)`，R² 预先计算
+- **出域**：`a = ā · R⁻¹ mod n`，等价于 `MontMul(ā, 1)`
+- 模幂主循环 ~4000 次模乘中，入/出域各 1 次，开销完全可忽略
+- R 为 `2^k`（k = 模数位宽）；R² 可由硬件或软件在 key load 阶段预计算
+
+### 2.6 其余算法参数（TBD）
+
+- 数据通路位宽（MAC 单元 bit 数）：TBD（决策 D）
+- 控制方式（FSM / 微码）：TBD（决策 E）
 
 ---
 
