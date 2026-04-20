@@ -19,7 +19,7 @@
 | 7 | 工艺节点 / 目标频率 | ✅ 已确认 | **仅 RTL 仿真**，不绑定工艺；标称频率 100 MHz |
 | 8 | 主机接口类型 | ✅ 已确认 | **纯 APB 32-bit**（控制 + operand 都走 APB） |
 | 9 | 密钥槽数量 | ✅ 已确认 | **0 槽**（不做 Key Vault，operand 每次 APB 写入） |
-| 10 | 安全等级（FIPS 140-3 Level） | ⬜ TBD | — |
+| 10 | 安全等级（FIPS 140-3 Level） | ✅ 已确认 | **不声明 FIPS 等级**（仅保留 Ladder 常数时间属性） |
 | 11 | 是否内置 TRNG | ⬜ TBD | — |
 | 12 | 是否内置 Hash 引擎 | ⬜ TBD | — |
 | 13 | 功耗预算 | ⬜ TBD | — |
@@ -320,10 +320,53 @@ start / done 握手启动下层 FSM：
 
 ---
 
-## 4. 安全设计（TBD）
+## 4. 安全设计（已确认：不声明 FIPS 等级）
 
-威胁模型和防护措施将在确认安全等级（FIPS 140-3 Level）后细化。
-私钥模幂路径的防护已在 2.1 节明确。
+本版本**不对标任何 FIPS 140-3 安全等级**，仅保留 Montgomery Ladder 算法
+本身天然具备的**常数时间**属性。所有商用 HSM 级别的硬件防护（KAT 自检、
+寄存器 parity、sensor、Key Vault、故障检测、zeroize FSM 等）均**不实现**。
+
+### 4.1 保留的安全属性
+
+| 属性 | 提供来源 | 说明 |
+|------|---------|------|
+| 常数时间执行 | Montgomery Ladder（算法） | 无 key-bit 相关分支，无早退；天然抗 SPA / timing attack |
+| 输入输出隔离 | APB 读写分窗口 | 结果必须通过显式读端口，不经其他通路泄露 |
+| 运算结束自动清寄存器 | done 阶段硬件复位 operand 寄存器 | 减少残留 |
+
+### 4.2 不实现的防护（有意留空）
+
+- KAT 上电自检
+- 寄存器 / SRAM parity 或 ECC
+- Exponent / message blinding（依赖 TRNG，见决策 #11）
+- CRT fault check（Bellcore 防护）
+- 故障注入传感器（时钟、电压、温度）
+- Key Vault（决策 #9 已确认无）
+- zeroize 指令与安全状态机
+- DFT 安全模式（scan chain 屏蔽）
+
+原因：
+- 匹配"简单电路原型"定位（决策 #1）
+- 与决策 #5（仅 Raw 模幂）、#7（仅仿真）、#9（0 密钥槽）保持一致
+- 所有防护都可在后续产品化工程（按 L1/L2/L3 逐级）新建模块补齐，
+  不影响当前核心电路的正确性与稳定性
+
+### 4.3 对 2.1 节私钥路径的更新
+
+2.1 节中 blinding 与 fault check 的防护步骤，在本原型中**不实现**；
+私钥路径的实际执行流程简化为：
+
+```
+私钥路径（签名 / 解密，原型简化版）：
+  1. CRT 分解：
+       mp = m^dp mod p
+       mq = m^dq mod q
+  2. 每一次模幂采用 Montgomery Ladder（常数时间）
+  3. CRT 合并：s = CRT_combine(mp, mq, p, q, qInv)
+  4. 输出 s
+```
+
+blinding / fault check 作为已知的扩展点，在决策 #11（TRNG）与后续产品化工程中再启用。
 
 ---
 
